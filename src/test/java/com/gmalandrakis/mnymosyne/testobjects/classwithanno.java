@@ -1,0 +1,14 @@
+package com.gmalandrakis.mnymosyne.testobjects;
+
+import com.gmalandrakis.mnemosyne.annotations.Cached;
+
+public class classwithanno {
+
+    @Cached(countdownFromCreation = true)
+    public String getStr(Integer i) {
+        if(i == 1){
+            return "Yey!";
+        }
+        return "Yoy";
+    }
+}

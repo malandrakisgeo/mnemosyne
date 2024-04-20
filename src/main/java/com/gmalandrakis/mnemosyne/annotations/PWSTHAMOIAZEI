@@ -1,0 +1,38 @@
+
+Xrhsths:
+
+@Cached()
+public User getUser(int id){
+//
+}
+
+An einai Spring,
+
+public class interceptor implements org.aopalliance.intercept.MethodInterceptor {
+
+    @Override
+    public Object invoke(MethodInvocation methodInvocation) throws Throwable {
+        1. Get proxy service for method (assume not null)
+        2. Call the invoke() method and return the result
+    }
+
+kai meta
+
+@Configuration
+@ComponentScan("spring.database")
+public class AopAllianceApplicationContext {
+
+    @Bean
+    public Advisor advisor() {
+        AspectJExpressionPointcut pointcut = new AspectJExpressionPointcut();
+        pointcut.setExpression("@annotation(com.gmalandrakis.mnemosyne.Cached)");
+        return new DefaultPointcutAdvisor(pointcut, new interceptor());
+    }
+
+}
+
+
+
+
+.....
+MnemosyneBuilder.generateForClasses(ClassName.class, ClassName2.class ...)
