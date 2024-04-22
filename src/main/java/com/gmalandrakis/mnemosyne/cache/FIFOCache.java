@@ -8,8 +8,8 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
 
 /**
-    The default cache, a FIFO-policy implemented with a ConcurrentMap and a ConcurrentLinkedQueue.
-    Strongly recommended for multithreaded environments.
+ * The default cache, a FIFO-policy implemented with a ConcurrentMap and a ConcurrentLinkedQueue.
+ * Strongly recommended for multithreaded environments.
  */
 public class FIFOCache<K, V> extends GenericCache<K, V> {
 
@@ -18,7 +18,7 @@ public class FIFOCache<K, V> extends GenericCache<K, V> {
 
     public FIFOCache(CacheParameters parameters) {
         super(parameters);
-        cachedValues =  new ConcurrentHashMap<>();
+        cachedValues = new ConcurrentHashMap<>();
     }
 
 
@@ -34,7 +34,7 @@ public class FIFOCache<K, V> extends GenericCache<K, V> {
 
     @Override
     void evict() {
-        if (concurrentFIFOQueue.size() == this.capacity) { //Assumes that the size never exceeds the capacity. Is it so? Or are there concurrency problems that can lead to a size larger than the capacity? TODO; Check
+        while (concurrentFIFOQueue.size() >= this.capacity) { //Assumes that the size never exceeds the capacity. Is it so? Or are there concurrency problems that can lead to a size larger than the capacity? TODO; Check
             cachedValues.remove(concurrentFIFOQueue.peek());
             concurrentFIFOQueue.remove();
         }
@@ -42,13 +42,17 @@ public class FIFOCache<K, V> extends GenericCache<K, V> {
 
     @Override
     public void put(K key, V value) {
-        if (key == null || value == null) {
-            return;
-        }
-        evict(); //Will evict if necessary
-        concurrentFIFOQueue.add(key);
-        var cEntry = new GenericCacheValue<>(value);
-        cachedValues.put(key, cEntry);
+      //  synchronized (concurrentFIFOQueue) {
+
+
+            if (key == null || value == null) {
+                return;
+            }
+            evict(); //Will evict if necessary
+            var cEntry = new GenericCacheValue<>(value);
+            concurrentFIFOQueue.add(key);
+            cachedValues.put(key, cEntry);
+       // }
     }
 
     @Override
@@ -61,7 +65,7 @@ public class FIFOCache<K, V> extends GenericCache<K, V> {
     }
 
     @Override
-    public void evictAll() {
+    public void invalidateCache() {
         cachedValues.clear();
         concurrentFIFOQueue.clear();
     }

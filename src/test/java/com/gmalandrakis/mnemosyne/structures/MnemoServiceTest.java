@@ -1,8 +1,6 @@
-package com.gmalandrakis.mnymosyne.structures;
+package com.gmalandrakis.mnemosyne.structures;
 
-import com.gmalandrakis.mnemosyne.cache.FIFOCache;
 import com.gmalandrakis.mnemosyne.core.MnemoService;
-import com.gmalandrakis.mnemosyne.structures.TestObject;
 import org.junit.Test;
 import org.mockito.Mockito;
 

@@ -23,7 +23,11 @@ public abstract class AbstractCache<K, V> {
 
     final long expirationTime;
 
-    final long forcedEvictionInterval;
+    /**
+     * The time interval for invalidating the cache (i.e. calling evictAll()) in milliseconds.
+     * If non-zero, a thread will periodically clear the cache.
+     */
+    final long forcedInvalidationInterval;
 
     /**
      * Determines whether the values expire expirationTime milliseconds after the last access (default)
@@ -36,7 +40,7 @@ public abstract class AbstractCache<K, V> {
     public AbstractCache(CacheParameters parameters) {
         this.capacity = (parameters.getCapacity() <= 0 ? Long.MAX_VALUE : parameters.getCapacity());
         this.expirationTime = (parameters.getTimeToLive() <= 0 ? Long.MAX_VALUE : parameters.getTimeToLive());
-        this.forcedEvictionInterval = (parameters.getForcedEvictionInterval() <= 0 ? Long.MAX_VALUE : parameters.getForcedEvictionInterval());
+        this.forcedInvalidationInterval = (parameters.getForcedEvictionInterval() < 0 ? Long.MAX_VALUE : parameters.getForcedEvictionInterval());
         this.name = parameters.getCacheName();
         this.countdownFromCreation = parameters.isCountdownFromCreation();
     }
@@ -72,7 +76,7 @@ public abstract class AbstractCache<K, V> {
     /**
      * Invalidates cache completely.
      */
-    abstract void evictAll();
+    abstract void invalidateCache();
 
     public long getCapacity() {
         return capacity;
@@ -82,8 +86,8 @@ public abstract class AbstractCache<K, V> {
         return expirationTime;
     }
 
-    public long getForcedEvictionInterval() {
-        return forcedEvictionInterval;
+    public long getForcedInvalidationInterval() {
+        return forcedInvalidationInterval;
     }
 
     public boolean isCountdownFromCreation() {

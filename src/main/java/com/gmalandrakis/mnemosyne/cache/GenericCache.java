@@ -22,15 +22,15 @@ abstract class GenericCache<K, V> extends AbstractCache<K, V> {
     public GenericCache(CacheParameters cacheParameters) {
         super(cacheParameters);
 
-        if (capacity != 0 || expirationTime != 0) {
+        if (getForcedInvalidationInterval() != 0) {
             internalThreadService = Executors.newFixedThreadPool(1);
-            internalThreadService.submit(this::defaultCacheEviction).isDone();
+            internalThreadService.submit(this::forcedInvalidation).isDone();
         }
     }
 
     @Override
     public void put(K key, V value) {
-        // this.cachedValues.put(key, value);
+        cachedValues.put(key, new GenericCacheValue<>(value));
     }
 
     @Override
@@ -40,10 +40,15 @@ abstract class GenericCache<K, V> extends AbstractCache<K, V> {
     }
 
     @Override
-    public void evictAll() {
-        var keySet = cachedValues.keySet();
-        for (var key : keySet) {
-            cachedValues.remove(key); //TODO: Test
+    public void invalidateCache() {
+        cachedValues.clear();
+    }
+
+    private void forcedInvalidation() {
+        var ms = this.getForcedInvalidationInterval();
+        while (ms != 0) {
+            sleepUninterrupted(ms);
+            invalidateCache();
         }
     }
 
@@ -54,36 +59,41 @@ abstract class GenericCache<K, V> extends AbstractCache<K, V> {
      * <p>
      * The thread does not lock the Map when idle, and evict() can still be called when necessary.
      * <p>
-     * The thread will normally not be interrupted, unless the JVM wants it to.
-     * If interrupted, the InterruptedException is suppressed and the sleep continues for the remaining time.
      */
-    private void defaultCacheEvictionInternal() {
-        long sleepStarted = 0;
-        long remainingSleep;
+    protected void defaultCacheEvictionInternal() {
         long sleepTime;
-        boolean sleepComplete = false;
 
         keepIdleWhenEmpty();
-        evict();
+        this.evict();
+        sleepTime = Math.min(capacity - cachedValues.size(), 1000); //TODO: Implement a smarter algorithm that takes into account the average time needed to evict.
 
-        sleepTime = Math.max(capacity - cachedValues.size(), 1000000000); //TODO: Implement a smarter algorithm that takes into account the average time needed to evict.
+        sleepUninterrupted(sleepTime);
+
+    }
+
+    /**
+     * Forces the thread to sleep for a number of milliseconds, and suppresses the interrupts.
+     * This is only meant to be used by internal threads whose sole purpose is to do something periodically.
+     */
+    private void sleepUninterrupted(long sleepTime) {
+        boolean sleepComplete = false;
+        long sleepStarted = 0;
+        long remainingSleep;
+
         remainingSleep = sleepTime;
-
         while (!sleepComplete) {
             try {
                 sleepStarted = System.currentTimeMillis();
-                System.out.println("in the thread!");
                 Thread.sleep(remainingSleep);
             } catch (InterruptedException e) {
                 //oops!
             } finally {
-                remainingSleep = remainingSleep - (System.currentTimeMillis() - sleepStarted);
+                remainingSleep = remainingSleep - (System.currentTimeMillis() - sleepStarted); //
             }
             if (remainingSleep <= 0) {
                 sleepComplete = true;
             }
         }
-
     }
 
     private void keepIdleWhenEmpty() {
@@ -99,7 +109,7 @@ abstract class GenericCache<K, V> extends AbstractCache<K, V> {
     protected void defaultCacheEviction() {
         do {
             this.defaultCacheEvictionInternal();
-        } while (capacity != 0);
-
+        } while (this.capacity != 0);
+        System.out.println("stopped running");
     }
 }

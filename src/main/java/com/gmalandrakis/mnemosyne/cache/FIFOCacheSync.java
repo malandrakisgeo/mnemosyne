@@ -60,7 +60,7 @@ public class FIFOCacheSync<K, V> extends AbstractCache<K, V> {
     }
 
     @Override
-    public void evictAll() {
+    public void invalidateCache() {
         synchronized (FIFOQueue) {
             FIFOQueue.clear();
         }

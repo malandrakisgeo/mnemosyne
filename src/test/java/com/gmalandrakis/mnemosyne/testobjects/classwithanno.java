@@ -1,4 +1,4 @@
-package com.gmalandrakis.mnymosyne.testobjects;
+package com.gmalandrakis.mnemosyne.testobjects;
 
 import com.gmalandrakis.mnemosyne.annotations.Cached;
 
