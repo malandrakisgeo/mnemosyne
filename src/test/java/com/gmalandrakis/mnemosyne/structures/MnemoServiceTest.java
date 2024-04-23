@@ -1,5 +1,6 @@
 package com.gmalandrakis.mnemosyne.structures;
 
+import com.gmalandrakis.mnemosyne.annotations.Cached;
 import com.gmalandrakis.mnemosyne.core.MnemoService;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -32,5 +33,20 @@ public class MnemoServiceTest {
         verify(example, times(2)).getStr(any());
 
 
+    }
+
+
+
+
+   public class TestObject {
+
+        @Cached(countdownFromCreation = true)
+        public String getStr(Integer i) {
+
+            if(i == 1){
+                return "Yey!";
+            }
+            return "Yoy";
+        }
     }
 }

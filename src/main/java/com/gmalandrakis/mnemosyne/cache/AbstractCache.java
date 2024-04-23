@@ -1,5 +1,6 @@
 package com.gmalandrakis.mnemosyne.cache;
 
+import com.gmalandrakis.mnemosyne.structures.AbstractCacheValue;
 import com.gmalandrakis.mnemosyne.structures.CacheParameters;
 
 /**
@@ -9,13 +10,13 @@ import com.gmalandrakis.mnemosyne.structures.CacheParameters;
  * Unless otherwise implemented, a negative or zero value in the fields translates to Long.MAX_VALUE.
  * <p>
  * For custom implementations, it is strongly recommended that the Map containing the keys and the values
- * wraps the latter with an implementation of {@link com.gmalandrakis.mnemosyne.core.AbstractCacheValue AbstractCacheValue},
+ * wraps the latter with an implementation of {@link AbstractCacheValue AbstractCacheValue},
  * i.e. that a Map&lt;K, ? extends AbstractCacheValue&lt;V&gt;&gt; is in use.
  * @param <K> The type of the keys used to retrieve the cache elements.
  * @param <V> The type of the values stored in the cache.
  * @author George Malandrakis (malandrakisgeo@gmail.com)
  * @see com.gmalandrakis.mnemosyne.structures.CacheParameters
- * @see com.gmalandrakis.mnemosyne.cache.GenericCache
+ * @see AbstractGenericCache
  */
 public abstract class AbstractCache<K, V> {
 
@@ -66,7 +67,7 @@ public abstract class AbstractCache<K, V> {
     /**
      * Removes all the expired or otherwise irrelevant entries.
      * <p>
-     * If the cache is an extension of the {@link com.gmalandrakis.mnemosyne.cache.GenericCache}, it will be
+     * If the cache is an extension of the {@link AbstractGenericCache}, it will be
      * called periodically by a dedicated thread. The frequency depends on the given capacity and current size
      * (i.e. the fuller the cache, the more frequent the calls).
      * <p>

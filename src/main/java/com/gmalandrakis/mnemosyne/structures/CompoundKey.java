@@ -6,10 +6,9 @@ import java.util.Arrays;
  * Unless an argument annotated with {@link com.gmalandrakis.mnemosyne.annotations.Key @Key} is present,
  * all the arguments to a {@link com.gmalandrakis.mnemosyne.annotations.Cached @Cached} function are assembled to a CompoundKey.
  * <p>
- * The CompoundKey consists of an array of arguments and deduces the hash of the Key
- * with a recursive algorithm that takes into account all the fields of all the arguments, and all subclasses they include.
+ * The CompoundKey consists of an array of objects. The deep contents of the objects are taken into account for the hash code and the equality.
  * <p>
- * If a CompoundKey exists, it is used as type in the implementation of {@link com.gmalandrakis.mnemosyne.core.AbstractCacheValue AbstractCacheValue} .
+ * If a CompoundKey exists, it is used as type in the implementation of {@link AbstractCacheValue AbstractCacheValue} .
  * </p>
  */
 public class CompoundKey {

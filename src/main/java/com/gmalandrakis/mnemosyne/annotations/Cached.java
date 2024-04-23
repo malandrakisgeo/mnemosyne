@@ -62,7 +62,7 @@ public @interface Cached {
 
     /**
      * Time interval between calls to the evictAll() function of the EvictionAlgorithm in milliseconds.
-     * The countdown starts on Cache creation (i.e. when the application is started).
+     * The countdown starts on Cache initialization.
      * Recommended if neither capacity(), nor expiration(), are set.
      * <p>
      * Negative values translate to Long.MAX_VALUE.

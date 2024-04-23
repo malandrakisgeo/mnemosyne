@@ -1,6 +1,7 @@
 package com.gmalandrakis.mnemosyne.cache;
 
-import com.gmalandrakis.mnemosyne.core.GenericCacheValue;
+import com.gmalandrakis.mnemosyne.structures.AbstractCacheValue;
+import com.gmalandrakis.mnemosyne.structures.GenericCacheValue;
 import com.gmalandrakis.mnemosyne.structures.CacheParameters;
 
 import java.util.*;
@@ -14,7 +15,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * @param <K>
  * @param <V>
  */
-public class LFUCache<K, V> extends GenericCache<K, V> {
+public class LFUCache<K, V> extends AbstractGenericCache<K, V> {
 
     private List<K> evictNext; //TODO: Make it concurrent
 
@@ -30,15 +31,9 @@ public class LFUCache<K, V> extends GenericCache<K, V> {
         if (evictNext.isEmpty() && cachedValues.size() >= capacity / 2) { //When cache is at least 50% full.
             this.setEvictNext();
         }
-        if (cachedValues.size() >= capacity * 95/100) { //The cache should never be fuller than 95%, unless inevitable by JVM concurrency
+        if (cachedValues.size() >= capacity * 95/100) { //The cache should never be fuller than 95%, unless inevitable by some concurrency issue.
             this.evict();
         }
-        /*var inMemoryValue = cachedValues.get(key);
-        if (inMemoryValue != null) {
-            //  doOnUpdateOrRetrieval(key, inMemoryValue);
-        } else {
-
-        }*/
         cachedValues.put(key, new GenericCacheValue<>(value));
     }
 
@@ -49,7 +44,6 @@ public class LFUCache<K, V> extends GenericCache<K, V> {
         var cacheVal = this.cachedValues.get(key);
         if (cacheVal != null) {
             toBeReturned = cacheVal.get(); //increase hits & update timestamp
-            //  doOnUpdateOrRetrieval(key, cacheVal);
         }
         return toBeReturned;
     }
@@ -96,7 +90,7 @@ public class LFUCache<K, V> extends GenericCache<K, V> {
         if(this.evictNext.isEmpty()){
             this.evictNext = cachedValues.entrySet().stream()
                     .sorted(Comparator.comparing(v -> v.getValue().getHits()))
-                    .sorted(Comparator.comparing(v -> v.getValue().getCreatedOn())) //TODO: or last accessed
+                    .sorted(Comparator.comparing(v -> v.getValue().getCreatedOn())) //TODO: improve
                     .map(Map.Entry::getKey)
                     .limit(capacity / 10) //Removes up to 10% of the values. Otherwise it would be called more often, which would be computationally inefficient. More than 10% might result in unnecessary memory overhead.
                     .toList();

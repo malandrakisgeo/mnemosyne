@@ -1,6 +1,5 @@
 package com.gmalandrakis.mnemosyne.cache;
 
-import com.gmalandrakis.mnemosyne.exception.crashTest;
 import com.gmalandrakis.mnemosyne.structures.CacheParameters;
 import org.junit.Before;
 import org.junit.Test;
@@ -15,7 +14,6 @@ public class FIFOTest {
     private CacheParameters cacheParameters;
     @Before
     public void test() {
-        var rr = new crashTest();
         cacheParameters = new CacheParameters();
         cacheParameters.setCapacity(totalItems-1);
         cacheParameters.setTimeToLive(1500000);
@@ -33,8 +31,6 @@ public class FIFOTest {
         }
         var p = fifoCacheSync.getTargetKey();
         assert (fifoCacheSync.get(p).equals("String0"+String.valueOf(totalItems-1)));
-
-
     }
 
     @Test
@@ -62,9 +58,9 @@ public class FIFOTest {
         executorService.submit(()-> this.fillWithItems(1001, 10000, fifoCacheSync)).isDone();
         executorService.submit(()-> this.fillWithItems(10001, totalItems+capacityExceededBy, fifoCacheSync)).isDone();
         Thread.sleep(1500); //TODO: Improve this
-        var p = fifoCacheSync.getTargetKey();
+        var nextToBeEvicted = fifoCacheSync.getTargetKey();
 
-        assert (fifoCacheSync.get(p).equals("String0"+String.valueOf(capacityExceededBy)));
+        assert (fifoCacheSync.get(nextToBeEvicted).equals("String0"+ capacityExceededBy));
 
     }
 

@@ -1,17 +1,16 @@
 package com.gmalandrakis.mnemosyne.cache;
 
-import com.gmalandrakis.mnemosyne.core.GenericCacheValue;
+import com.gmalandrakis.mnemosyne.structures.GenericCacheValue;
 import com.gmalandrakis.mnemosyne.structures.CacheParameters;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ConcurrentMap;
 
 /**
  * The default cache, a FIFO-policy implemented with a ConcurrentMap and a ConcurrentLinkedQueue.
  * Strongly recommended for multithreaded environments.
  */
-public class FIFOCache<K, V> extends GenericCache<K, V> {
+public class FIFOCache<K, V> extends AbstractGenericCache<K, V> {
 
     private final ConcurrentLinkedQueue<K> concurrentFIFOQueue = new ConcurrentLinkedQueue<>();
 
@@ -42,17 +41,13 @@ public class FIFOCache<K, V> extends GenericCache<K, V> {
 
     @Override
     public void put(K key, V value) {
-      //  synchronized (concurrentFIFOQueue) {
-
-
-            if (key == null || value == null) {
-                return;
-            }
-            evict(); //Will evict if necessary
-            var cEntry = new GenericCacheValue<>(value);
-            concurrentFIFOQueue.add(key);
-            cachedValues.put(key, cEntry);
-       // }
+        if (key == null || value == null) {
+            return;
+        }
+        evict(); //Will evict if necessary
+        var cEntry = new GenericCacheValue<>(value);
+        concurrentFIFOQueue.add(key);
+        cachedValues.put(key, cEntry);
     }
 
     @Override
