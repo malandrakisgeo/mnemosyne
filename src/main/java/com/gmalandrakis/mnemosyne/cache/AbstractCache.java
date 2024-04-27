@@ -12,6 +12,7 @@ import com.gmalandrakis.mnemosyne.structures.CacheParameters;
  * For custom implementations, it is strongly recommended that the Map containing the keys and the values
  * wraps the latter with an implementation of {@link AbstractCacheValue AbstractCacheValue},
  * i.e. that a Map&lt;K, ? extends AbstractCacheValue&lt;V&gt;&gt; is in use.
+ *
  * @param <K> The type of the keys used to retrieve the cache elements.
  * @param <V> The type of the values stored in the cache.
  * @author George Malandrakis (malandrakisgeo@gmail.com)
@@ -20,15 +21,15 @@ import com.gmalandrakis.mnemosyne.structures.CacheParameters;
  */
 public abstract class AbstractCache<K, V> {
 
-    final long capacity;
+    int capacity;
 
-    final long expirationTime;
+    long expirationTime;
 
     /**
      * The time interval for invalidating the cache (i.e. calling evictAll()) in milliseconds.
      * If non-zero, a thread will periodically clear the cache.
      */
-    final long forcedInvalidationInterval;
+    long invalidationInterval;
 
     /**
      * Determines whether the values expire expirationTime milliseconds after the last access (default)
@@ -36,14 +37,16 @@ public abstract class AbstractCache<K, V> {
      */
     boolean countdownFromCreation = false;
 
-    final String name;
+    short capacityPercentageForEviction;
+    String name;
 
     public AbstractCache(CacheParameters parameters) {
-        this.capacity = (parameters.getCapacity() <= 0 ? Long.MAX_VALUE : parameters.getCapacity());
+        this.capacity = (parameters.getCapacity() <= 0 ? Integer.MAX_VALUE : parameters.getCapacity());
         this.expirationTime = (parameters.getTimeToLive() <= 0 ? Long.MAX_VALUE : parameters.getTimeToLive());
-        this.forcedInvalidationInterval = (parameters.getForcedEvictionInterval() < 0 ? Long.MAX_VALUE : parameters.getForcedEvictionInterval());
+        this.invalidationInterval = (parameters.getInvalidationInterval() < 0 ? Long.MAX_VALUE : parameters.getInvalidationInterval());
         this.name = parameters.getCacheName();
         this.countdownFromCreation = parameters.isCountdownFromCreation();
+        this.capacityPercentageForEviction = (parameters.getCapacityPercentageForEviction() < 0 || parameters.getCapacityPercentageForEviction() > 100 ? 0 : parameters.getCapacityPercentageForEviction());
     }
 
     public abstract void put(K key, V value);
@@ -67,10 +70,6 @@ public abstract class AbstractCache<K, V> {
     /**
      * Removes all the expired or otherwise irrelevant entries.
      * <p>
-     * If the cache is an extension of the {@link AbstractGenericCache}, it will be
-     * called periodically by a dedicated thread. The frequency depends on the given capacity and current size
-     * (i.e. the fuller the cache, the more frequent the calls).
-     * <p>
      */
     abstract void evict();
 
@@ -87,8 +86,8 @@ public abstract class AbstractCache<K, V> {
         return expirationTime;
     }
 
-    public long getForcedInvalidationInterval() {
-        return forcedInvalidationInterval;
+    public long getInvalidationInterval() {
+        return invalidationInterval;
     }
 
     public boolean isCountdownFromCreation() {
@@ -98,4 +97,9 @@ public abstract class AbstractCache<K, V> {
     public String getName() {
         return name;
     }
+
+    public short getCapacityPercentageForEviction() {
+        return capacityPercentageForEviction;
+    }
+
 }

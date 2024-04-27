@@ -1,6 +1,5 @@
 package com.gmalandrakis.mnemosyne.cache;
 
-import com.gmalandrakis.mnemosyne.structures.AbstractCacheValue;
 import com.gmalandrakis.mnemosyne.structures.GenericCacheValue;
 import com.gmalandrakis.mnemosyne.structures.CacheParameters;
 
@@ -17,23 +16,22 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class LFUCache<K, V> extends AbstractGenericCache<K, V> {
 
-    private List<K> evictNext; //TODO: Make it concurrent
+    protected List<K> evictNext;
+    private int limit;
 
     public LFUCache(CacheParameters parameters) {
         super(parameters);
         cachedValues = new ConcurrentHashMap<>();
-        //this.internalThreadService.submit(this::setEvictNext);
-        evictNext = Collections.synchronizedList(Collections.emptyList());
+        evictNext = Collections.synchronizedList(new ArrayList<>());
+        limit = this.capacity * 0.15 > 1 ? (int) (this.capacity * 0.15) : 1; //TODO: Improve
     }
 
     @Override
     public void put(K key, V value) {
-        if (evictNext.isEmpty() && cachedValues.size() >= capacity / 2) { //When cache is at least 50% full.
-            this.setEvictNext();
+        if (cachedValues.size() >= capacity) {
+            this.evict(); //Ideally, this statement is never reached, and evict() is called by the internal threads before the size exceeds the capacity. But if multiple threads write concurrently in the cache, they will likely prevent the internal threads from evicting it.
         }
-        if (cachedValues.size() >= capacity * 95/100) { //The cache should never be fuller than 95%, unless inevitable by some concurrency issue.
-            this.evict();
-        }
+
         cachedValues.put(key, new GenericCacheValue<>(value));
     }
 
@@ -55,7 +53,7 @@ public class LFUCache<K, V> extends AbstractGenericCache<K, V> {
 
     @Override
     public K getTargetKey() {
-        if(!evictNext.isEmpty()){
+        if (!evictNext.isEmpty()) {
             return evictNext.get(0);
         }
         return null; //A null is better than a random value
@@ -64,13 +62,17 @@ public class LFUCache<K, V> extends AbstractGenericCache<K, V> {
 
     @Override
     public void evict() {
-        synchronized (evictNext){
-            if (evictNext.isEmpty()) {
-                this.setEvictNext();
-            }
-            evictNext.forEach(k -> cachedValues.remove(k));
-            evictNext = Collections.synchronizedList(Collections.emptyList());
+        if (evictNext.isEmpty()) {
+            this.setEvictNext();
         }
+
+        synchronized (evictNext) {
+            if (cachedValues.size() >= capacity * capacityPercentageForEviction / 100) {
+                evictNext.forEach(cachedValues::remove);
+                evictNext.clear();
+            }
+        }
+
     }
 
     /*
@@ -83,24 +85,47 @@ public class LFUCache<K, V> extends AbstractGenericCache<K, V> {
         The resulting cache is, as a Greek-speaker would put it, "slower than death".
 
         This is a computationally more efficient solution, that generates a list of keys that can be evicted, based on the hits and their creation/lastAccess time.
-        Whenever the cache becomes 50% full, a list of the values that can soon be evicted is generated based on hits, as well as creation timestamp.
-        No expiration date is taken into account here, but remember you are free to implement your own algorithms.
+        Whenever the cache becomes X% full, a list of the values that can soon be evicted is generated based on hits, as well as creation timestamp.
+
      */
-    private synchronized void setEvictNext() {
-        if(this.evictNext.isEmpty()){
-            this.evictNext = cachedValues.entrySet().stream()
-                    .sorted(Comparator.comparing(v -> v.getValue().getHits()))
-                    .sorted(Comparator.comparing(v -> v.getValue().getCreatedOn())) //TODO: improve
-                    .map(Map.Entry::getKey)
-                    .limit(capacity / 10) //Removes up to 10% of the values. Otherwise it would be called more often, which would be computationally inefficient. More than 10% might result in unnecessary memory overhead.
-                    .toList();
+
+    protected void setEvictNext() {
+        synchronized (evictNext) {
+            if (evictNext.isEmpty()) {
+                var tempLimit = limit;
+                if (this.cachedValues.size() >= this.capacity) {
+                    tempLimit = limit + this.cachedValues.size() - this.capacity;
+                }
+
+                List<K> toBeEvicted = new ArrayList<>();
+
+                cachedValues.entrySet().forEach(kGenericCacheValueEntry -> {
+                    if (isExpired(kGenericCacheValueEntry)) {
+                        toBeEvicted.add(kGenericCacheValueEntry.getKey());
+                    }
+                });
+                var tempLst = cachedValues.entrySet().stream()
+                        .sorted(Comparator.comparingLong(v -> v.getValue().getCreatedOn()))
+                        .sorted(Comparator.comparingInt(v -> v.getValue().getHits()))
+                        .map(Map.Entry::getKey)
+                        .limit(tempLimit) //Removes up to 15% of the values. Otherwise it would be called more often, which would be computationally inefficient. More than 15% might result in unnecessary memory overhead.
+                        .toList();
+                toBeEvicted.addAll(tempLst);
+
+                evictNext = Collections.synchronizedList(toBeEvicted);
+            }
         }
     }
 
     @Override
     public void invalidateCache() {
         cachedValues.clear();
-        evictNext = Collections.synchronizedList(Collections.emptyList());
+        evictNext = Collections.synchronizedList(new ArrayList<>());
+    }
+
+    private boolean isExpired(Map.Entry<K, GenericCacheValue<V>> kGenericCacheValueEntry) {
+        long chosenVal = countdownFromCreation ? kGenericCacheValueEntry.getValue().getCreatedOn() : kGenericCacheValueEntry.getValue().getLastAccessed();
+        return (System.currentTimeMillis() - chosenVal) >= expirationTime;
     }
 
 

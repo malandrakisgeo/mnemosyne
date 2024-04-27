@@ -8,7 +8,7 @@ public abstract class AbstractCacheValue<V> {
 
     long lastAccessed;
     long createdOn;
-    long hits;
+    int hits;
     V value;
 
     AbstractCacheValue(V value) {
@@ -29,7 +29,7 @@ public abstract class AbstractCacheValue<V> {
         return createdOn;
     }
 
-    public long getHits() {
+    public int getHits() {
         return hits;
     }
 

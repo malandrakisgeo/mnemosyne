@@ -19,7 +19,7 @@ public class ELFUCache<K, V> {
     ExecutorService internalThreadService;
     private final ConcurrentMap<K, GenericCacheValue<V>> cachedValues = new ConcurrentHashMap<>();
 
-    private final ConcurrentMap<Long, ArrayList<K>> frequencyMap = new ConcurrentHashMap<>();
+    private final ConcurrentMap<Integer, ArrayList<K>> frequencyMap = new ConcurrentHashMap<>();
     long capacity;
     long TTL;
 
@@ -38,13 +38,13 @@ public class ELFUCache<K, V> {
         if (inMemoryValue != null) {
             doOnUpdateOrRetrieval(key, inMemoryValue);
         } else {
-            var map = frequencyMap.get(1L);
+            var map = frequencyMap.get(1);
             if (map != null) {
                 map.add(key);
             } else {
                 ArrayList<K> lst = new ArrayList<>();
                 lst.add(key);
-                frequencyMap.put(1L, lst);
+                frequencyMap.put(1, lst);
             }
         }
         cachedValues.put(key, new GenericCacheValue<>(value));
@@ -88,7 +88,7 @@ public class ELFUCache<K, V> {
 
 
     public void evictAll() {
-        for (Long l : frequencyMap.keySet()) {
+        for (Integer l : frequencyMap.keySet()) {
             frequencyMap.remove(l);
         }
     }

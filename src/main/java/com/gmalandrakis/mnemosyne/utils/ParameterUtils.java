@@ -11,8 +11,10 @@ public class ParameterUtils {
         cacheParameters.setCapacity(annotation.capacity());
         cacheParameters.setCountdownFromCreation(annotation.countdownFromCreation());
         cacheParameters.setTimeToLive(annotation.timeToLive());
-        cacheParameters.setForcedEvictionInterval(annotation.forcedEvictionInterval());
+        cacheParameters.setInvalidationInterval(annotation.invalidationInterval());
         cacheParameters.setCacheType(annotation.cacheType());
+        cacheParameters.setThreadPoolSize(annotation.threadPoolSize());
+        cacheParameters.setCapacityPercentageForEviction(annotation.preemptiveEvictionPercentage());
         return cacheParameters;
     }
 }

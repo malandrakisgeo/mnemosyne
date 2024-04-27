@@ -8,6 +8,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
  * The default cache, a FIFO-policy implemented with a ConcurrentMap and a ConcurrentLinkedQueue.
+ *
  * Strongly recommended for multithreaded environments.
  */
 public class FIFOCache<K, V> extends AbstractGenericCache<K, V> {
@@ -18,6 +19,10 @@ public class FIFOCache<K, V> extends AbstractGenericCache<K, V> {
     public FIFOCache(CacheParameters parameters) {
         super(parameters);
         cachedValues = new ConcurrentHashMap<>();
+        if(parameters.getTimeToLive() != Long.MAX_VALUE){
+            this.invalidationInterval = parameters.getTimeToLive();
+            internalThreadService.submit(this::forcedInvalidation).isDone();
+        }
     }
 
 
@@ -33,7 +38,7 @@ public class FIFOCache<K, V> extends AbstractGenericCache<K, V> {
 
     @Override
     void evict() {
-        while (concurrentFIFOQueue.size() >= this.capacity) { //Assumes that the size never exceeds the capacity. Is it so? Or are there concurrency problems that can lead to a size larger than the capacity? TODO; Check
+        while (concurrentFIFOQueue.size() >= this.capacity) {
             cachedValues.remove(concurrentFIFOQueue.peek());
             concurrentFIFOQueue.remove();
         }

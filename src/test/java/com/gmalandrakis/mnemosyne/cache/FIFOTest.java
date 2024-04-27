@@ -17,8 +17,9 @@ public class FIFOTest {
         cacheParameters = new CacheParameters();
         cacheParameters.setCapacity(totalItems-1);
         cacheParameters.setTimeToLive(1500000);
-        cacheParameters.setForcedEvictionInterval(200000000);
+        cacheParameters.setInvalidationInterval(200000000);
         cacheParameters.setCacheName("fifo-example");
+        cacheParameters.setThreadPoolSize(1);
 
     }
 

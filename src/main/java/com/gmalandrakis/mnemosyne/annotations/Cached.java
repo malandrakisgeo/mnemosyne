@@ -23,7 +23,7 @@ import com.gmalandrakis.mnemosyne.core.MnemoProxy;
 public @interface Cached {
 
     /**
-     * Mnymosyne uses the value defined here to connect the method or type to an implementation of {@link AbstractCache}
+     * Mnemosyne uses the value defined here to connect the method or type to an implementation of {@link AbstractCache}
      * that has been defined in the cache service.
      * <p>
      * If the name does not correspond to an existing Cache, a Runtime exception will be thrown.
@@ -39,7 +39,7 @@ public @interface Cached {
      * either live as long as the program, or have lifetimes depending on the algorithm
      * itself (e.g. the oldest FIFO entry "lives" as long as the cache is not full).
      * <p>
-     * Negative values translate to Long.MAX_VALUE.
+     * Zero and negative values to Long.MAX_VALUE.
      *
      * @return The expiration time of the values in milliseconds.
      */
@@ -48,27 +48,27 @@ public @interface Cached {
     /**
      * The maximum number of entries in the cache.
      * <p>
-     * If the value is non-zero, a cache-specific thread checks periodically if the Cache is full and
-     * calls evict().
+     * The use of this value is up to the implementation of the AbstractCache.
+     * E.g. in an AbstractGenericCache, if the value is non-zero, an internal thread checks periodically the size of the cache and
+     * calls evict() if needed.
      * <p>
      * By default, there is no capacity, and that means that all entries are kept in memory
      * as long as the program runs unless evicted by other mechanisms.
      * <p>
-     * Negative values translate to Long.MAX_VALUE.
+     * Zero and negative values translate to Integer.MAX_VALUE.
      *
      * @return
      */
-    long capacity() default 0;
+    int capacity() default 0;
 
     /**
      * Time interval between calls to the evictAll() function of the EvictionAlgorithm in milliseconds.
      * The countdown starts on Cache initialization.
-     * Recommended if neither capacity(), nor expiration(), are set.
+     * Recommended if neither capacity(), nor timeToLive(), are set.
      * <p>
-     * Negative values translate to Long.MAX_VALUE.
+     * Zero and negative values translate to Long.MAX_VALUE.
      */
-    long forcedEvictionInterval() default 0;
-
+    long invalidationInterval() default 0;
 
     /**
      * Determines whether the values expire X milliseconds after the last access (default)
@@ -77,5 +77,27 @@ public @interface Cached {
     boolean countdownFromCreation() default false;
 
     Class<? extends AbstractCache> cacheType() default FIFOCache.class;
+
+    /**
+     * Defines the number of available threads in the internal ThreadPool of the cache.
+     * If not set, a CachedThreadPool is used for instances of {@link com.gmalandrakis.mnemosyne.cache.AbstractGenericCache AbstractGenericCache}.
+     */
+    int threadPoolSize() default 0;
+
+    /**
+     * Evict preemptively if the size of the cache exceeds this percentage of the total capacity.
+     * <p>
+     * Depending on the size of the cache, the complexity of the algorithm, and the number of threads writing concurrently on it,
+     * it can take time to compute the values that should be evicted next, and even the actual eviction can be time-consuming.
+     * Is may be prudent to start the procedure before the size reaches 100% of the capacity.
+     * <p>
+     * The use of this value is up to the implementation of the AbstractCache.
+     * <p>
+     * If set for implementations of AbstractGenericCache, an internal thread periodically checks
+     * the current size of the cache and evicts if the percentage of the size compared to total capacity is more than this.
+     * <p>
+     * Values over 100 or negative are zeroed.
+     */
+    short preemptiveEvictionPercentage() default 0;
 
 }

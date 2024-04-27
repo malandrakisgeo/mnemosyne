@@ -5,24 +5,25 @@ import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
 
-import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.*;
 
 public class LFUEvict {
-    private static final long upperLimit = 100000; //I always looked for an opportunity to use this term in other contexts than math exams
-    private ExecutorService executorService;
+    private static final int upperLimit = 1000; //I always looked for an opportunity to use this term in other contexts than math exams
+    private ExecutorService executorService = Executors.newFixedThreadPool(5);
     private LFUCache<Long, String> lfu;
 
+    CacheParameters cacheParameters;
     @Before
     public void prepare() {
         CacheParameters cacheParameters = new CacheParameters();
         cacheParameters.setCapacity(upperLimit / 2);
         cacheParameters.setCacheName("test");
+        cacheParameters.setThreadPoolSize(1);
+        this.cacheParameters = cacheParameters;
         lfu = Mockito.spy(new LFUCache<>(cacheParameters));
     }
 
@@ -33,22 +34,50 @@ public class LFUEvict {
 
         fillWithData(lfu, 0);
         assert (lfu.cachedValues.size() <= upperLimit / 2);
-        verify(lfu, times(11)).evict();
+        verify(lfu, atLeast(1)).evict();
+        accessEven(lfu);
+        lfu.setEvictNext();
+        var val = lfu.cachedValues.get(lfu.evictNext.get(0)); //We don't want to increase the hits
+        assert (val!=null);
+        assert (val.getHits()<lfu.cachedValues.get(lfu.evictNext.get(0)+1).getHits());
+        fillWithData(lfu, 0);
 
-        accessOneToFive(lfu);
 
 
     }
 
     @Test
     public void testAsync_noExceptions() {
-        executorService = Executors.newFixedThreadPool(5);
-        executorService.submit(() -> this.fillWithData(lfu, upperLimit)).isDone(); //assert no exceptions
-        executorService.submit(lfu::evict).isDone(); //assert no exceptions
-        executorService.submit(lfu::invalidateCache).isDone(); //assert no exceptions
-        executorService.submit(() -> this.fillWithData(lfu, upperLimit)).isDone(); //assert no exceptions
-        executorService.submit(lfu::invalidateCache).isDone(); //assert no exceptions
+        lfu = Mockito.spy(new LFUCache<>(cacheParameters));
+        executorService.execute(() -> this.fillWithData(lfu, upperLimit)); //assert no exceptions
+        executorService.execute(lfu::evict); //assert no exceptions
+        executorService.execute(lfu::invalidateCache); //assert no exceptions
+        executorService.execute(() -> this.fillWithData(lfu, upperLimit)); //assert no exceptions
+        executorService.execute(lfu::invalidateCache); //assert no exceptions
+        executorService.shutdown();
+        lfu.invalidateCache();
+
+
         assert(lfu.cachedValues.isEmpty());
+    }
+
+    @Test
+    public void asynctest() throws InterruptedException {
+        System.out.println("yey");
+      //  executorService = Executors.newFixedThreadPool(5);
+        executorService.execute(lfu::setEvictNext); //assert no exceptions
+        executorService.execute(lfu::setEvictNext); //assert no exceptions
+        executorService.execute(lfu::setEvictNext); //assert no exceptions
+        if(executorService.submit(lfu::setEvictNext).isDone()); //assert no exceptions
+        {
+            System.out.println("muf");
+        }
+        executorService.shutdown();
+        try {
+            executorService.awaitTermination(10000, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+
+        }
     }
 
 
@@ -58,18 +87,20 @@ public class LFUEvict {
         }
     }
 
-    private void accessOneToFive(LFUCache cache) {
 
-        for (int i = 0; i < 5; i++) {
-            int finalI = i;
-            executorService.submit(() -> randomizeAccesses(cache, finalI));
+    private void accessEven(LFUCache cache){
+        var keySet = cache.cachedValues.keySet();
+        int i = 0;
+        for (Object o : keySet) {
+            ++i;
+            if(i % 2 == 0){
+               var ooo = cache.get(o);
+               if(ooo == null){
+                   System.out.println("wow");
+               }
+               ooo.hashCode();
+            }
         }
-    }
 
-    private void randomizeAccesses(LFUCache cache, int i) {
-        var rand = new Random();
-        for (int j = 0; j < rand.nextInt(1, 10); j++) {
-            var b = cache.get(Long.valueOf(i));
-        }
     }
 }

@@ -13,11 +13,15 @@ public class CacheParameters {
 
     private long timeToLive;
 
-    private long capacity;
+    private int capacity;
 
-    private long forcedEvictionInterval;
+    private long invalidationInterval;
+
+    private int threadPoolSize;
 
     private boolean countdownFromCreation;
+
+    private short capacityPercentageForEviction;
 
     public String getCacheName() {
         return cacheName;
@@ -35,20 +39,20 @@ public class CacheParameters {
         this.timeToLive = timeToLive;
     }
 
-    public long getCapacity() {
+    public int getCapacity() {
         return capacity;
     }
 
-    public void setCapacity(long capacity) {
+    public void setCapacity(int capacity) {
         this.capacity = capacity;
     }
 
-    public long getForcedEvictionInterval() {
-        return forcedEvictionInterval;
+    public long getInvalidationInterval() {
+        return invalidationInterval;
     }
 
-    public void setForcedEvictionInterval(long forcedEvictionInterval) {
-        this.forcedEvictionInterval = forcedEvictionInterval;
+    public void setInvalidationInterval(long invalidationInterval) {
+        this.invalidationInterval = invalidationInterval;
     }
 
     public boolean isCountdownFromCreation() {
@@ -65,5 +69,21 @@ public class CacheParameters {
 
     public void setCacheType(Class<? extends AbstractCache> cacheType) {
         this.cacheType = cacheType;
+    }
+
+    public int getThreadPoolSize() {
+        return threadPoolSize;
+    }
+
+    public void setThreadPoolSize(int threadPoolSize) {
+        this.threadPoolSize = threadPoolSize;
+    }
+
+    public short getCapacityPercentageForEviction() {
+        return capacityPercentageForEviction;
+    }
+
+    public void setCapacityPercentageForEviction(short capacityPercentageForEviction) {
+        this.capacityPercentageForEviction = capacityPercentageForEviction;
     }
 }

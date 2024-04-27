@@ -14,18 +14,22 @@ import java.util.concurrent.Executors;
  * The build-in Cache algorithms provided by mnemosyne are implementations of AbstractGenericCache.
  * <p>
  */
-abstract class AbstractGenericCache<K, V> extends AbstractCache<K, V> {
+public abstract class AbstractGenericCache<K, V> extends AbstractCache<K, V> {
     ExecutorService internalThreadService;
     ConcurrentMap<K, GenericCacheValue<V>> cachedValues;
 
 
     public AbstractGenericCache(CacheParameters cacheParameters) {
         super(cacheParameters);
-
-        if (getForcedInvalidationInterval() != 0) {
-            internalThreadService = Executors.newFixedThreadPool(1);
-            internalThreadService.submit(this::forcedInvalidation).isDone();
+        if (cacheParameters.getCapacityPercentageForEviction() == 0) {
+            this.capacityPercentageForEviction = 80;
         }
+        if (cacheParameters.getThreadPoolSize() != 0) {
+            internalThreadService = Executors.newFixedThreadPool(cacheParameters.getThreadPoolSize());
+        } else {
+            internalThreadService = Executors.newCachedThreadPool();
+        }
+        setInternalThreads();
     }
 
     @Override
@@ -44,35 +48,25 @@ abstract class AbstractGenericCache<K, V> extends AbstractCache<K, V> {
         cachedValues.clear();
     }
 
-    private void forcedInvalidation() {
-        var ms = this.getForcedInvalidationInterval();
+    protected void forcedInvalidation() {
+        var ms = this.invalidationInterval;
         while (ms != 0) {
             sleepUninterrupted(ms);
             invalidateCache();
         }
     }
 
-    /**
-     * A dedicated thread (i.e. private in the cache) calls evict() periodically and sleeps for
-     * a number of milliseconds that depends on the capacity and the current size of the cache
-     * (i.e. the fuller the cache is, the more frequent the invocation of evict()).
-     * <p>
-     * The thread does not lock the Map when idle, and evict() can still be called when necessary.
-     * <p>
-     */
-    protected void defaultCacheEvictionInternal() {
-        long sleepTime;
-
-        keepIdleWhenEmpty();
-        this.evict();
-        sleepTime = Math.min(capacity - cachedValues.size(), 1000); //TODO: Implement a smarter algorithm that takes into account the average time needed to evict.
-
-        sleepUninterrupted(sleepTime);
-
+    protected void periodicallyEvict() {
+        while (true) {
+            if (cachedValues.size() >= capacity * (capacityPercentageForEviction / 100)) {
+                evict();
+            }
+            sleepUninterrupted(100);
+        }
     }
 
     /**
-     * Forces the thread to sleep for a number of milliseconds, and suppresses the interrupts.
+     * Puts the thread to sleep for a number of milliseconds, and suppresses the interrupts.
      * This is only meant to be used by internal threads whose sole purpose is to do something periodically.
      */
     private void sleepUninterrupted(long sleepTime) {
@@ -106,10 +100,14 @@ abstract class AbstractGenericCache<K, V> extends AbstractCache<K, V> {
         }
     }
 
-    protected void defaultCacheEviction() {
-        do {
-            this.defaultCacheEvictionInternal();
-        } while (this.capacity != 0);
-        System.out.println("stopped running");
+    protected void setInternalThreads() {
+        if (invalidationInterval != 0) {
+            internalThreadService.execute(this::forcedInvalidation);
+        }
+        if (capacity != Integer.MAX_VALUE) {
+            internalThreadService.execute(this::periodicallyEvict);
+        }
     }
+
+
 }
