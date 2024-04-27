@@ -14,7 +14,7 @@ public class ParameterUtils {
         cacheParameters.setInvalidationInterval(annotation.invalidationInterval());
         cacheParameters.setCacheType(annotation.cacheType());
         cacheParameters.setThreadPoolSize(annotation.threadPoolSize());
-        cacheParameters.setCapacityPercentageForEviction(annotation.preemptiveEvictionPercentage());
+        cacheParameters.setPreemptiveEvictionPercentage(annotation.preemptiveEvictionPercentage());
         return cacheParameters;
     }
 }

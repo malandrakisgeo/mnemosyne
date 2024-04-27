@@ -21,7 +21,7 @@ public class CacheParameters {
 
     private boolean countdownFromCreation;
 
-    private short capacityPercentageForEviction;
+    private short preemptiveEvictionPercentage;
 
     public String getCacheName() {
         return cacheName;
@@ -79,11 +79,11 @@ public class CacheParameters {
         this.threadPoolSize = threadPoolSize;
     }
 
-    public short getCapacityPercentageForEviction() {
-        return capacityPercentageForEviction;
+    public short getPreemptiveEvictionPercentage() {
+        return preemptiveEvictionPercentage;
     }
 
-    public void setCapacityPercentageForEviction(short capacityPercentageForEviction) {
-        this.capacityPercentageForEviction = capacityPercentageForEviction;
+    public void setPreemptiveEvictionPercentage(short preemptiveEvictionPercentage) {
+        this.preemptiveEvictionPercentage = preemptiveEvictionPercentage;
     }
 }

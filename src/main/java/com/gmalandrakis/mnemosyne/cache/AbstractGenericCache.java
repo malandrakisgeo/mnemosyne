@@ -21,7 +21,7 @@ public abstract class AbstractGenericCache<K, V> extends AbstractCache<K, V> {
 
     public AbstractGenericCache(CacheParameters cacheParameters) {
         super(cacheParameters);
-        if (cacheParameters.getCapacityPercentageForEviction() == 0) {
+        if (cacheParameters.getPreemptiveEvictionPercentage() == 0) {
             this.capacityPercentageForEviction = 80;
         }
         if (cacheParameters.getThreadPoolSize() != 0) {

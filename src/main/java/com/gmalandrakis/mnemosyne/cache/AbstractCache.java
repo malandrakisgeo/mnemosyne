@@ -46,7 +46,7 @@ public abstract class AbstractCache<K, V> {
         this.invalidationInterval = (parameters.getInvalidationInterval() < 0 ? Long.MAX_VALUE : parameters.getInvalidationInterval());
         this.name = parameters.getCacheName();
         this.countdownFromCreation = parameters.isCountdownFromCreation();
-        this.capacityPercentageForEviction = (parameters.getCapacityPercentageForEviction() < 0 || parameters.getCapacityPercentageForEviction() > 100 ? 0 : parameters.getCapacityPercentageForEviction());
+        this.capacityPercentageForEviction = (parameters.getPreemptiveEvictionPercentage() < 0 || parameters.getPreemptiveEvictionPercentage() > 100 ? 0 : parameters.getPreemptiveEvictionPercentage());
     }
 
     public abstract void put(K key, V value);

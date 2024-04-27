@@ -63,14 +63,12 @@ public class LFUEvict {
 
     @Test
     public void asynctest() throws InterruptedException {
-        System.out.println("yey");
       //  executorService = Executors.newFixedThreadPool(5);
         executorService.execute(lfu::setEvictNext); //assert no exceptions
         executorService.execute(lfu::setEvictNext); //assert no exceptions
         executorService.execute(lfu::setEvictNext); //assert no exceptions
         if(executorService.submit(lfu::setEvictNext).isDone()); //assert no exceptions
         {
-            System.out.println("muf");
         }
         executorService.shutdown();
         try {
@@ -97,6 +95,7 @@ public class LFUEvict {
                var ooo = cache.get(o);
                if(ooo == null){
                    System.out.println("wow");
+                   throw new RuntimeException();
                }
                ooo.hashCode();
             }
