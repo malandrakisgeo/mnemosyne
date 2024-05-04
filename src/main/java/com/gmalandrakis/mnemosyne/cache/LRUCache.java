@@ -9,17 +9,17 @@ public class LRUCache<K,V> extends AbstractGenericCache<K, V> {
     }
 
     @Override
-    String getAlgorithmName() {
+    public String getAlgorithmName() {
         return null;
     }
 
     @Override
-    K getTargetKey() {
+    public K getTargetKey() {
         return null;
     }
 
     @Override
-    void evict() {
+    public void evict() {
 
     }
 }

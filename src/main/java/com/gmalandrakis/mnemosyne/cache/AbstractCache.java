@@ -46,7 +46,7 @@ public abstract class AbstractCache<K, V> {
     /**
      * @return the name of the eviction algorithm
      */
-    abstract String getAlgorithmName();
+    public abstract String getAlgorithmName();
 
     /**
      * Used to retrieve the next element that is of most interest to the algorithm.
@@ -55,18 +55,18 @@ public abstract class AbstractCache<K, V> {
      *
      * @return The key of the element that the eviction algorithm may target next.
      */
-    abstract K getTargetKey();
+    public abstract K getTargetKey();
 
     /**
      * Removes all the expired or otherwise irrelevant entries.
      * <p>
      */
-    abstract void evict();
+    public abstract void evict();
 
     /**
      * Invalidates cache completely.
      */
-    abstract void invalidateCache();
+    public abstract void invalidateCache();
 
 
 }

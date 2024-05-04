@@ -1,5 +1,5 @@
 # Mnemosyne
-Mnemosyne is a cache library for Java applications.
+Mnemosyne is a small and customizable cache library for Java applications.
 
 ## Why mnemosyne?
 Many if not most of the existing cache libraries are unnecessarily complex, making it difficult even for experienced programmers

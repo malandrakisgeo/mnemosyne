@@ -38,7 +38,7 @@ public class FIFOCache<K, V> extends AbstractGenericCache<K, V> {
     }
 
     @Override
-    void evict() {
+    public void evict() {
         while (concurrentFIFOQueue.size() >= this.capacity) {
             cachedValues.remove(concurrentFIFOQueue.peek());
             concurrentFIFOQueue.remove();
