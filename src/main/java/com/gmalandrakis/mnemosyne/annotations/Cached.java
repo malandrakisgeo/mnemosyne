@@ -7,7 +7,7 @@ import java.lang.annotation.Target;
 import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
-import com.gmalandrakis.mnemosyne.cache.AbstractCache;
+import com.gmalandrakis.mnemosyne.cache.AbstractMnemosyneCache;
 import com.gmalandrakis.mnemosyne.cache.FIFOCache;
 import com.gmalandrakis.mnemosyne.core.MnemoProxy;
 
@@ -16,6 +16,9 @@ import com.gmalandrakis.mnemosyne.core.MnemoProxy;
  * <p>
  * When applied to a method, all arguments are considered as a key, unless one of them
  * is annotated as {@link com.gmalandrakis.mnemosyne.annotations.Key @Key}.
+ * <p>
+ * When using any implementation of {@link com.gmalandrakis.mnemosyne.cache.AbstractGenericCache @AbstractGenericCache}, all of
+ * the fields here are utilized. Otherwise it depends on the specific implementation
  */
 @Documented
 @Target({METHOD})
@@ -23,7 +26,6 @@ import com.gmalandrakis.mnemosyne.core.MnemoProxy;
 public @interface Cached {
 
     /**
-     *
      * @return The name of the cache in use.
      */
     String cacheName() default "";
@@ -38,7 +40,7 @@ public @interface Cached {
     /**
      * Defines the cache algorithm.
      */
-    Class<? extends AbstractCache> cacheType() default FIFOCache.class;
+    Class<? extends AbstractMnemosyneCache> cacheType() default FIFOCache.class;
 
     /**
      * Many cache algorithms take into account a TTL (Time To Live) value, i.e. the time after which the value is no longer relevant.
@@ -47,7 +49,7 @@ public @interface Cached {
      * either live as long as the program, or have lifetimes depending on the algorithm
      * itself (e.g. the oldest FIFO entry "lives" as long as the queue is not full).
      * <p>
-     * Zero and negative values translate to Long.MAX_VALUE.
+     * In implementations of AbstractGenericCache, zero and negative values translate to Long.MAX_VALUE.
      *
      * @return The expiration time of the values in milliseconds.
      */
@@ -58,7 +60,7 @@ public @interface Cached {
      * The countdown starts on Cache initialization.
      * Recommended if neither capacity(), nor timeToLive(), are set.
      * <p>
-     * Zero and negative values translate to Long.MAX_VALUE.
+     * In implementations of AbstractGenericCache, zero and negative values translate to Long.MAX_VALUE.
      */
     long invalidationInterval() default 0;
 
@@ -66,12 +68,12 @@ public @interface Cached {
     /**
      * The maximum number of entries in the cache.
      * <p>
-     * The use of this value is up to the implementation of the AbstractCache.
+     * The use of this value is up to the implementation of the AbstractMnemosyneCache.
      * <p>
      * By default, there is no capacity, and that means that all entries are kept in memory
      * as long as the program runs unless evicted by other mechanisms.
      * <p>
-     * Zero and negative values translate to Integer.MAX_VALUE.
+     * In implementations of AbstractGenericCache, zero and negative values translate to Integer.MAX_VALUE.
      */
     int capacity() default 0;
 
@@ -83,19 +85,18 @@ public @interface Cached {
     int threadPoolSize() default 0;
 
     /**
-     * Evict preemptively if the size of the cache exceeds this percentage of the total capacity.
+     * Evict preemptively if the size of the cache exceeds a certain percentage of the total capacity.
      * <p>
-     * Depending on the size of the cache, the complexity of the algorithm, and the number of threads writing concurrently on it,
+     * Depending on the size of the cache, the complexity of the algorithm, and the number of threads concurrently writing on it,
      * it can take time to compute the values that should be evicted next, and even the actual eviction can be time-consuming.
      * It may be prudent to start the procedure before the size reaches 100% of the capacity.
      * <p>
-     * The use of this value is up to the implementation of the AbstractCache.
+     * The use of this value is up to the implementation of the AbstractMnemosyneCache.
      * <p>
-     * The default value is 80 for implementations of AbstractGenericCache, and an internal thread periodically checks
-     * the current size of the cache and evicts if the percentage of the size compared to total capacity is more than this.
-     * <p>
-     * Values over 100 or negative are zeroed, which means that only capacity is taken into account.
+     * In implementations of AbstractGenericCache, values over 100 or negative are switched to 80. An internal thread periodically checks
+     * the current size of the cache and evicts if the percentage of the size compared to total capacity is equal or larger than this.
+     * A value of 100 means that only capacity is taken into account.
      */
-    short preemptiveEvictionPercentage() default 0;
+    short preemptiveEvictionPercentage() default 80;
 
 }

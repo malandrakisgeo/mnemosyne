@@ -1,7 +1,7 @@
 package com.gmalandrakis.mnemosyne.core;
 
 import com.gmalandrakis.mnemosyne.annotations.Key;
-import com.gmalandrakis.mnemosyne.cache.AbstractCache;
+import com.gmalandrakis.mnemosyne.cache.AbstractMnemosyneCache;
 import com.gmalandrakis.mnemosyne.structures.CompoundKey;
 
 import java.lang.annotation.Annotation;
@@ -9,10 +9,10 @@ import java.lang.reflect.Method;
 
 public class MnemoProxy<K, V> {
 
-    private AbstractCache<K, V> cache;
+    private AbstractMnemosyneCache<K, V> cache;
     private Method forMethod;
 
-    public MnemoProxy(AbstractCache<K,V> cache, Method method) {
+    public MnemoProxy(AbstractMnemosyneCache<K,V> cache, Method method) {
         this.cache = cache;
         this.forMethod = method;
     }

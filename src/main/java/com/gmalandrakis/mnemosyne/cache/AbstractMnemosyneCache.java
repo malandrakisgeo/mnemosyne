@@ -1,14 +1,9 @@
 package com.gmalandrakis.mnemosyne.cache;
 
 import com.gmalandrakis.mnemosyne.structures.AbstractCacheValue;
-import com.gmalandrakis.mnemosyne.structures.CacheParameters;
 
 /**
  * A general description of the Caches used by mnemosyne.
- * <p>
- * The fields declared here are explained in {@link com.gmalandrakis.mnemosyne.annotations.Cached @Cached}.
- * <p>
- * Implementations are expected, though not required, to have non-zero values in the aforementioned fields.
  * <p>
  * For custom implementations, it is strongly recommended that the Map containing the keys and the values
  * wraps the latter with an implementation of {@link AbstractCacheValue AbstractCacheValue},
@@ -20,23 +15,9 @@ import com.gmalandrakis.mnemosyne.structures.CacheParameters;
  * @see com.gmalandrakis.mnemosyne.structures.CacheParameters
  * @see AbstractGenericCache
  */
-public abstract class AbstractCache<K, V> {
-    String name;
-    boolean countdownFromCreation = false;
-    long expirationTime;
-    long invalidationInterval;
+public abstract class AbstractMnemosyneCache<K, V> {
 
-    int capacity;
-
-    short capacityPercentageForEviction;
-
-    public AbstractCache(CacheParameters parameters) {
-        this.capacity = (parameters.getCapacity() <= 0 ? Integer.MAX_VALUE : parameters.getCapacity());
-        this.expirationTime = (parameters.getTimeToLive() <= 0 ? Long.MAX_VALUE : parameters.getTimeToLive());
-        this.invalidationInterval = (parameters.getInvalidationInterval() < 0 ? Long.MAX_VALUE : parameters.getInvalidationInterval());
-        this.name = parameters.getCacheName();
-        this.countdownFromCreation = parameters.isCountdownFromCreation();
-        this.capacityPercentageForEviction = (parameters.getPreemptiveEvictionPercentage() < 0 || parameters.getPreemptiveEvictionPercentage() > 100 ? 0 : parameters.getPreemptiveEvictionPercentage());
+    public AbstractMnemosyneCache() {
     }
 
     public abstract void put(K key, V value);

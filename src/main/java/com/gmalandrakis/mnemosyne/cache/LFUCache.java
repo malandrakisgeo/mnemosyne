@@ -23,7 +23,7 @@ public class LFUCache<K, V> extends AbstractGenericCache<K, V> {
         super(parameters);
         cachedValues = new ConcurrentHashMap<>();
         evictNext = Collections.synchronizedList(new ArrayList<>());
-        limit = this.capacity * 0.15 > 1 ? (int) (this.capacity * 0.15) : 1; //TODO: Improve
+        limit = Math.max((int) (capacity * 0.15), 1);
     }
 
     @Override

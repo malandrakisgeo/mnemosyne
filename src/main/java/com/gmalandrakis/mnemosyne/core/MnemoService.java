@@ -1,7 +1,7 @@
 package com.gmalandrakis.mnemosyne.core;
 
 import com.gmalandrakis.mnemosyne.annotations.Cached;
-import com.gmalandrakis.mnemosyne.cache.AbstractCache;
+import com.gmalandrakis.mnemosyne.cache.AbstractMnemosyneCache;
 import com.gmalandrakis.mnemosyne.structures.CacheParameters;
 
 import java.lang.reflect.Method;
@@ -12,7 +12,7 @@ import static com.gmalandrakis.mnemosyne.utils.ParameterUtils.annotationValuesTo
 public class MnemoService {
     private HashMap<Method, MnemoProxy<?, ?>> proxies = new HashMap<>();
 
-    AbstractCache<?, ?> createCache(CacheParameters parameters) {
+    AbstractMnemosyneCache<?, ?> createCache(CacheParameters parameters) {
         return null;
     }
 
@@ -23,7 +23,7 @@ public class MnemoService {
         try {
             var cacheParams = annotationValuesToCacheParameters(annotation);
             var algoClass = cacheParams.getCacheType();
-            AbstractCache cache = algoClass.getDeclaredConstructor(CacheParameters.class).newInstance(cacheParams);
+            AbstractMnemosyneCache cache = algoClass.getDeclaredConstructor(CacheParameters.class).newInstance(cacheParams);
             var proxyService = new MnemoProxy<>(cache, method);
             proxies.put(method, proxyService);
             return proxyService;

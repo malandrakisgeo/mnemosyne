@@ -1,14 +1,14 @@
 package com.gmalandrakis.mnemosyne.structures;
 
 
-import com.gmalandrakis.mnemosyne.cache.AbstractCache;
+import com.gmalandrakis.mnemosyne.cache.AbstractMnemosyneCache;
 
 /**
  * @see com.gmalandrakis.mnemosyne.annotations.Cached Cached
  */
 public class CacheParameters {
 
-    private Class<? extends AbstractCache> cacheType;
+    private Class<? extends AbstractMnemosyneCache> cacheType;
     private String cacheName;
 
     private long timeToLive;
@@ -63,11 +63,11 @@ public class CacheParameters {
         this.countdownFromCreation = countdownFromCreation;
     }
 
-    public Class<? extends AbstractCache> getCacheType() {
+    public Class<? extends AbstractMnemosyneCache> getCacheType() {
         return cacheType;
     }
 
-    public void setCacheType(Class<? extends AbstractCache> cacheType) {
+    public void setCacheType(Class<? extends AbstractMnemosyneCache> cacheType) {
         this.cacheType = cacheType;
     }
 
