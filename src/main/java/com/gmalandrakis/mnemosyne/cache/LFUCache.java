@@ -27,7 +27,7 @@ public class LFUCache<K, V> extends AbstractGenericCache<K, V> {
     }
 
     @Override
-    public void put(K key, V value) {
+    public void put(K key, V value) { //We don't check if the value already exists, since MnemoProxy already does this.
         if (cachedValues.size() >= capacity) {
             this.evict(); //Ideally, this statement is never reached, and evict() is called by the internal threads before the size exceeds the capacity. But if multiple threads write concurrently in the cache, they will likely prevent the internal threads from evicting it.
         }
@@ -61,16 +61,15 @@ public class LFUCache<K, V> extends AbstractGenericCache<K, V> {
 
 
     @Override
-    public void evict() {
+    public synchronized void evict() {
         if (evictNext.isEmpty()) {
             this.setEvictNext();
         }
 
-        synchronized (evictNext) {
-            if (cachedValues.size() >= capacity * capacityPercentageForEviction / 100) {
-                evictNext.forEach(cachedValues::remove);
-                evictNext.clear();
-            }
+        if (cachedValues.size() >= capacity * capacityPercentageForEviction / 100) {
+            evictNext.forEach(cachedValues::remove);
+            evictNext.clear();
+
         }
 
     }
@@ -123,8 +122,8 @@ public class LFUCache<K, V> extends AbstractGenericCache<K, V> {
         evictNext = Collections.synchronizedList(new ArrayList<>());
     }
 
-    private boolean isExpired(Map.Entry<K, GenericCacheValue<V>> kGenericCacheValueEntry) {
-        long chosenVal = countdownFromCreation ? kGenericCacheValueEntry.getValue().getCreatedOn() : kGenericCacheValueEntry.getValue().getLastAccessed();
+    private boolean isExpired(Map.Entry<K, GenericCacheValue<V>> entry) {
+        long chosenVal = countdownFromCreation ? entry.getValue().getCreatedOn() : entry.getValue().getLastAccessed();
         return (System.currentTimeMillis() - chosenVal) >= expirationTime;
     }
 

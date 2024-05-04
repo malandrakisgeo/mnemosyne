@@ -8,7 +8,7 @@ import com.gmalandrakis.mnemosyne.cache.AbstractCache;
  */
 public class CacheParameters {
 
-    private  Class<? extends AbstractCache> cacheType;
+    private Class<? extends AbstractCache> cacheType;
     private String cacheName;
 
     private long timeToLive;

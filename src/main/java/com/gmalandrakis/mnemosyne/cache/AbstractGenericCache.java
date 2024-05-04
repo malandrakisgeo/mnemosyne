@@ -61,7 +61,8 @@ public abstract class AbstractGenericCache<K, V> extends AbstractCache<K, V> {
             if (cachedValues.size() >= capacity * (capacityPercentageForEviction / 100)) {
                 evict();
             }
-            sleepUninterrupted(100);
+            var sleepTime = Math.max(100 - Thread.activeCount(), 1);
+            sleepUninterrupted(sleepTime);
         }
     }
 
@@ -101,7 +102,7 @@ public abstract class AbstractGenericCache<K, V> extends AbstractCache<K, V> {
     }
 
     protected void setInternalThreads() {
-        if (invalidationInterval != 0) {
+        if (invalidationInterval != Long.MAX_VALUE) {
             internalThreadService.execute(this::forcedInvalidation);
         }
         if (capacity != Integer.MAX_VALUE) {

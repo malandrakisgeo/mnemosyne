@@ -3,12 +3,13 @@ package com.gmalandrakis.mnemosyne.cache;
 import com.gmalandrakis.mnemosyne.structures.GenericCacheValue;
 import com.gmalandrakis.mnemosyne.structures.CacheParameters;
 
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
  * The default cache, a FIFO-policy implemented with a ConcurrentMap and a ConcurrentLinkedQueue.
- *
+ * <p>
  * Strongly recommended for multithreaded environments.
  */
 public class FIFOCache<K, V> extends AbstractGenericCache<K, V> {
@@ -19,7 +20,7 @@ public class FIFOCache<K, V> extends AbstractGenericCache<K, V> {
     public FIFOCache(CacheParameters parameters) {
         super(parameters);
         cachedValues = new ConcurrentHashMap<>();
-        if(parameters.getTimeToLive() != Long.MAX_VALUE){
+        if (parameters.getTimeToLive() != Long.MAX_VALUE) {
             this.invalidationInterval = parameters.getTimeToLive();
             internalThreadService.submit(this::forcedInvalidation).isDone();
         }
@@ -51,7 +52,7 @@ public class FIFOCache<K, V> extends AbstractGenericCache<K, V> {
         }
         evict(); //Will evict if necessary
         var cEntry = new GenericCacheValue<>(value);
-        concurrentFIFOQueue.add(key);
+        concurrentFIFOQueue.add(key); //We don't check if the value already exists, since MnemoProxy already does this.
         cachedValues.put(key, cEntry);
     }
 

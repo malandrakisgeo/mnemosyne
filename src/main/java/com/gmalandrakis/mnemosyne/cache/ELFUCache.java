@@ -112,7 +112,7 @@ public class ELFUCache<K, V> {
         try {
             Thread.sleep(100000); //This is good. It prevents concurrency issues.
         } catch (Exception e) {
-            //Suppress
+            //oopsie goopsie!
         }
     }
 }

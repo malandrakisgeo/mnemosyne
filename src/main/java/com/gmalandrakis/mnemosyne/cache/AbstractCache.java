@@ -6,8 +6,9 @@ import com.gmalandrakis.mnemosyne.structures.CacheParameters;
 /**
  * A general description of the Caches used by mnemosyne.
  * <p>
- * Implementations are expected, though not required, to have non-zero values in the fields declared here.
- * Unless otherwise implemented, a negative or zero value in the fields translates to Long.MAX_VALUE.
+ * The fields declared here are explained in {@link com.gmalandrakis.mnemosyne.annotations.Cached @Cached}.
+ * <p>
+ * Implementations are expected, though not required, to have non-zero values in the aforementioned fields.
  * <p>
  * For custom implementations, it is strongly recommended that the Map containing the keys and the values
  * wraps the latter with an implementation of {@link AbstractCacheValue AbstractCacheValue},
@@ -20,25 +21,14 @@ import com.gmalandrakis.mnemosyne.structures.CacheParameters;
  * @see AbstractGenericCache
  */
 public abstract class AbstractCache<K, V> {
+    String name;
+    boolean countdownFromCreation = false;
+    long expirationTime;
+    long invalidationInterval;
 
     int capacity;
 
-    long expirationTime;
-
-    /**
-     * The time interval for invalidating the cache (i.e. calling evictAll()) in milliseconds.
-     * If non-zero, a thread will periodically clear the cache.
-     */
-    long invalidationInterval;
-
-    /**
-     * Determines whether the values expire expirationTime milliseconds after the last access (default)
-     * or after creation.
-     */
-    boolean countdownFromCreation = false;
-
     short capacityPercentageForEviction;
-    String name;
 
     public AbstractCache(CacheParameters parameters) {
         this.capacity = (parameters.getCapacity() <= 0 ? Integer.MAX_VALUE : parameters.getCapacity());
@@ -78,28 +68,5 @@ public abstract class AbstractCache<K, V> {
      */
     abstract void invalidateCache();
 
-    public long getCapacity() {
-        return capacity;
-    }
-
-    public long getExpirationTime() {
-        return expirationTime;
-    }
-
-    public long getInvalidationInterval() {
-        return invalidationInterval;
-    }
-
-    public boolean isCountdownFromCreation() {
-        return countdownFromCreation;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public short getCapacityPercentageForEviction() {
-        return capacityPercentageForEviction;
-    }
 
 }

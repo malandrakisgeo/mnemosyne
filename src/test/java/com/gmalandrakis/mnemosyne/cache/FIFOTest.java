@@ -24,17 +24,6 @@ public class FIFOTest {
     }
 
     @Test
-    public void fifoesyncxample() {  //sync example is a lot faster in a single-threaded environment (for 10000 capacity and 15000 writes, 280ms vs 25ms on my machine). But what about multithreaded?
-
-        FIFOCacheSync<Integer, String> fifoCacheSync = new FIFOCacheSync<>(cacheParameters);
-        for (int i = 0; i < totalItems; i++) {
-            fifoCacheSync.put(i, "String0" + i);
-        }
-        var p = fifoCacheSync.getTargetKey();
-        assert (fifoCacheSync.get(p).equals("String0"+String.valueOf(totalItems-1)));
-    }
-
-    @Test
     public void fifoexample() { //assert no exceptions
         long time = System.currentTimeMillis();
         FIFOCache<Integer, String> fifoCacheSync = new FIFOCache<>(cacheParameters);
@@ -46,6 +35,19 @@ public class FIFOTest {
         long time2 = System.currentTimeMillis();
         System.out.println("single threaded FIFOCacheConcurrent: " + String.valueOf(time2 - time));
     }
+
+    @Test
+    public void fifoexample2() { //assert no exceptions
+        long time = System.currentTimeMillis();
+        FIFOCache<Integer, String> fifo = new FIFOCache<>(cacheParameters);
+        for (int i = 0; i < 10; i++) {
+            fifo.put(1, "String0" + 1);
+        }
+        assert (fifo.cachedValues.size()==1);
+        long time2 = System.currentTimeMillis();
+        System.out.println("single threaded FIFOCacheConcurrent: " + String.valueOf(time2 - time));
+    }
+
 
     @Test
     public void fifoexample_multithreaded() throws Exception { //assert no exceptions

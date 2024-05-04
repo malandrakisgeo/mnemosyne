@@ -5,7 +5,6 @@ package com.gmalandrakis.mnemosyne.structures;
  * @see GenericCacheValue
  */
 public abstract class AbstractCacheValue<V> {
-
     long lastAccessed;
     long createdOn;
     int hits;
@@ -17,9 +16,9 @@ public abstract class AbstractCacheValue<V> {
         hits = 1;
     }
 
-    public abstract V get() ;
+    public abstract V get();
 
-    public abstract void update(V updated) ;
+    public abstract void update(V updated);
 
     public long getLastAccessed() {
         return lastAccessed;
