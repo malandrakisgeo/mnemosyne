@@ -17,12 +17,11 @@ import com.gmalandrakis.mnemosyne.structures.AbstractCacheValue;
  */
 public abstract class AbstractMnemosyneCache<K, V> {
 
-    public AbstractMnemosyneCache() {
-    }
-
     public abstract void put(K key, V value);
 
     public abstract V get(K key);
+
+    public abstract void remove(K key);
 
     /**
      * @return the name of the eviction algorithm

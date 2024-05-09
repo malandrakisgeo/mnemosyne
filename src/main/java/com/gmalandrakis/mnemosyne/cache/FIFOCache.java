@@ -3,14 +3,15 @@ package com.gmalandrakis.mnemosyne.cache;
 import com.gmalandrakis.mnemosyne.structures.GenericCacheValue;
 import com.gmalandrakis.mnemosyne.structures.CacheParameters;
 
-import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
  * The default cache, a FIFO-policy implemented with a ConcurrentMap and a ConcurrentLinkedQueue.
- * <p>
- * Strongly recommended for multithreaded environments.
+ *
+ * @param <K> The type of the keys used to retrieve the cache elements.
+ * @param <V> The type of the values stored in the cache.
+ * @author George Malandrakis (malandrakisgeo@gmail.com)
  */
 public class FIFOCache<K, V> extends AbstractGenericCache<K, V> {
 
@@ -63,6 +64,12 @@ public class FIFOCache<K, V> extends AbstractGenericCache<K, V> {
             return cacheVal.get();
         }
         return null;
+    }
+
+    @Override
+    public void remove(K key) {
+        cachedValues.remove(key);
+        concurrentFIFOQueue.remove(key);
     }
 
     @Override

@@ -23,6 +23,9 @@ public class CacheParameters {
 
     private short preemptiveEvictionPercentage;
 
+    private short evictionStepPercentage;
+
+
     public String getCacheName() {
         return cacheName;
     }
@@ -85,5 +88,13 @@ public class CacheParameters {
 
     public void setPreemptiveEvictionPercentage(short preemptiveEvictionPercentage) {
         this.preemptiveEvictionPercentage = preemptiveEvictionPercentage;
+    }
+
+    public short getEvictionStepPercentage() {
+        return evictionStepPercentage;
+    }
+
+    public void setEvictionStepPercentage(short evictionStepPercentage) {
+        this.evictionStepPercentage = evictionStepPercentage;
     }
 }

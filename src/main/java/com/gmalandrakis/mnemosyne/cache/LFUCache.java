@@ -4,26 +4,20 @@ import com.gmalandrakis.mnemosyne.structures.GenericCacheValue;
 import com.gmalandrakis.mnemosyne.structures.CacheParameters;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Implementation of an LFU (Least Frequently Used) cache.
- * This implementation a "raw", strict LFU, meaning that nothing other than frequency is taken into account.
- * When the
  *
- * @param <K>
- * @param <V>
+ * @param <K> The type of the keys used to retrieve the cache elements.
+ * @param <V> The type of the values stored in the cache.
  */
 public class LFUCache<K, V> extends AbstractGenericCache<K, V> {
 
     protected List<K> evictNext;
-    private int limit;
 
     public LFUCache(CacheParameters parameters) {
         super(parameters);
-        cachedValues = new ConcurrentHashMap<>();
         evictNext = Collections.synchronizedList(new ArrayList<>());
-        limit = Math.max((int) (capacity * 0.15), 1);
     }
 
     @Override
@@ -91,23 +85,18 @@ public class LFUCache<K, V> extends AbstractGenericCache<K, V> {
     protected void setEvictNext() {
         synchronized (evictNext) {
             if (evictNext.isEmpty()) {
-                var tempLimit = limit;
+                var tempLimit = Math.max((int) (capacity * evictionStepPercentage / 100f), 1);
                 if (this.cachedValues.size() >= this.capacity) {
-                    tempLimit = limit + this.cachedValues.size() - this.capacity;
+                    tempLimit += (this.cachedValues.size() - this.capacity);
                 }
 
-                List<K> toBeEvicted = new ArrayList<>();
+                List<K> toBeEvicted = new ArrayList<>(cachedValues.entrySet().stream().filter(this::isExpired).map(Map.Entry::getKey).toList());
 
-                cachedValues.entrySet().forEach(kGenericCacheValueEntry -> {
-                    if (isExpired(kGenericCacheValueEntry)) {
-                        toBeEvicted.add(kGenericCacheValueEntry.getKey());
-                    }
-                });
                 var tempLst = cachedValues.entrySet().stream()
                         .sorted(Comparator.comparingLong(v -> v.getValue().getCreatedOn()))
                         .sorted(Comparator.comparingInt(v -> v.getValue().getHits()))
                         .map(Map.Entry::getKey)
-                        .limit(tempLimit) //Removes up to 15% of the values. Otherwise it would be called more often, which would be computationally inefficient. More than 15% might result in unnecessary memory overhead.
+                        .limit(tempLimit)
                         .toList();
                 toBeEvicted.addAll(tempLst);
 
@@ -120,11 +109,6 @@ public class LFUCache<K, V> extends AbstractGenericCache<K, V> {
     public void invalidateCache() {
         cachedValues.clear();
         evictNext = Collections.synchronizedList(new ArrayList<>());
-    }
-
-    private boolean isExpired(Map.Entry<K, GenericCacheValue<V>> entry) {
-        long chosenVal = countdownFromCreation ? entry.getValue().getCreatedOn() : entry.getValue().getLastAccessed();
-        return (System.currentTimeMillis() - chosenVal) >= expirationTime;
     }
 
 

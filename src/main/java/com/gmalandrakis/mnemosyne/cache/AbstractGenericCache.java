@@ -4,6 +4,8 @@ package com.gmalandrakis.mnemosyne.cache;
 import com.gmalandrakis.mnemosyne.structures.GenericCacheValue;
 import com.gmalandrakis.mnemosyne.structures.CacheParameters;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -26,16 +28,18 @@ public abstract class AbstractGenericCache<K, V> extends AbstractMnemosyneCache<
     long invalidationInterval;
     int capacity;
     short capacityPercentageForEviction;
+    short evictionStepPercentage;
 
     public AbstractGenericCache(CacheParameters parameters) {
         super();
+        cachedValues = new ConcurrentHashMap<>();
         this.capacity = (parameters.getCapacity() <= 0 ? Integer.MAX_VALUE : parameters.getCapacity());
         this.expirationTime = (parameters.getTimeToLive() <= 0 ? Long.MAX_VALUE : parameters.getTimeToLive());
         this.invalidationInterval = (parameters.getInvalidationInterval() < 0 ? Long.MAX_VALUE : parameters.getInvalidationInterval());
         this.name = parameters.getCacheName();
         this.countdownFromCreation = parameters.isCountdownFromCreation();
         this.capacityPercentageForEviction = (parameters.getPreemptiveEvictionPercentage() < 0 || parameters.getPreemptiveEvictionPercentage() > 100 ? 100 : parameters.getPreemptiveEvictionPercentage());
-
+        this.evictionStepPercentage =  (parameters.getEvictionStepPercentage() < 0 || parameters.getEvictionStepPercentage() > 100) ? 0 : parameters.getEvictionStepPercentage();
         if (parameters.getThreadPoolSize() != 0) {
             internalThreadService = Executors.newFixedThreadPool(parameters.getThreadPoolSize());
         } else {
@@ -53,6 +57,11 @@ public abstract class AbstractGenericCache<K, V> extends AbstractMnemosyneCache<
     public V get(K key) {
         var val = cachedValues.get(key);
         return val != null ? val.get() : null; //TODO: Add value expiration check
+    }
+
+    @Override
+    public void remove(K key) {
+        cachedValues.remove(key);
     }
 
     @Override
@@ -79,12 +88,17 @@ public abstract class AbstractGenericCache<K, V> extends AbstractMnemosyneCache<
 
     protected void periodicallyEvict() {
         while (true) {
-            if (cachedValues.size() >= capacity * (capacityPercentageForEviction / 100)) {
+            if (cachedValues.size() >= capacity * (capacityPercentageForEviction / 100f)) {
                 evict();
             }
-            var sleepTime = Math.max(100 - Thread.activeCount(), 1);
+            var sleepTime = Math.max(100 - Thread.activeCount(), 10);
             sleepUninterrupted(sleepTime);
         }
+    }
+
+    protected boolean isExpired(Map.Entry<K, GenericCacheValue<V>> entry) {
+        long chosenVal = countdownFromCreation ? entry.getValue().getCreatedOn() : entry.getValue().getLastAccessed();
+        return (System.currentTimeMillis() - chosenVal) > this.expirationTime;         //System.currentTimeMillis() is very slow on Linux though very fast on Windows, but System.nanoTime() the opposite. TODO: Utreda
     }
 
     /**
@@ -104,7 +118,7 @@ public abstract class AbstractGenericCache<K, V> extends AbstractMnemosyneCache<
             } catch (InterruptedException e) {
                 //oops!
             } finally {
-                remainingSleep = remainingSleep - (System.currentTimeMillis() - sleepStarted); //
+                remainingSleep = remainingSleep - (System.currentTimeMillis() - sleepStarted);
             }
             if (remainingSleep <= 0) {
                 sleepComplete = true;

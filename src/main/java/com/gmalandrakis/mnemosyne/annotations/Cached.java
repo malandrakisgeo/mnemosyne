@@ -43,7 +43,7 @@ public @interface Cached {
     Class<? extends AbstractMnemosyneCache> cacheType() default FIFOCache.class;
 
     /**
-     * Many cache algorithms take into account a TTL (Time To Live) value, i.e. the time after which the value is no longer relevant.
+     * The TTL (Time To Live) in milliseconds, i.e. the time after which the value is no longer relevant.
      * <p>
      * By default, there is no TTL, which means that the cache entries
      * either live as long as the program, or have lifetimes depending on the algorithm
@@ -98,5 +98,14 @@ public @interface Cached {
      * A value of 100 means that only capacity is taken into account.
      */
     short preemptiveEvictionPercentage() default 80;
+
+
+    /**
+     * The percentage of non-expired entries to be removed when the cache is full.
+     * <p>
+     * In implementations of AbstractGenericCache, a zero value (not recommended) means that exactly one non-expired entry is removed
+     * on every eviction. Values over 100 and negative are regarded as zero.
+     */
+    short evictionStepPercentage() default 15;
 
 }
