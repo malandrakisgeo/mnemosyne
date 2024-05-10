@@ -60,7 +60,7 @@ public class LFUCache<K, V> extends AbstractGenericCache<K, V> {
             this.setEvictNext();
         }
 
-        if (cachedValues.size() >= capacity * capacityPercentageForEviction / 100) {
+        if (cachedValues.size() >= capacity * capacityPercentageForEviction / 100f) {
             evictNext.forEach(cachedValues::remove);
             evictNext.clear();
 

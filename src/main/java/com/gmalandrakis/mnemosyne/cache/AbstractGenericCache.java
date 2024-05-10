@@ -35,10 +35,10 @@ public abstract class AbstractGenericCache<K, V> extends AbstractMnemosyneCache<
         cachedValues = new ConcurrentHashMap<>();
         this.capacity = (parameters.getCapacity() <= 0 ? Integer.MAX_VALUE : parameters.getCapacity());
         this.expirationTime = (parameters.getTimeToLive() <= 0 ? Long.MAX_VALUE : parameters.getTimeToLive());
-        this.invalidationInterval = (parameters.getInvalidationInterval() < 0 ? Long.MAX_VALUE : parameters.getInvalidationInterval());
+        this.invalidationInterval = (parameters.getInvalidationInterval() <= 0 ? Long.MAX_VALUE : parameters.getInvalidationInterval());
         this.name = parameters.getCacheName();
         this.countdownFromCreation = parameters.isCountdownFromCreation();
-        this.capacityPercentageForEviction = (parameters.getPreemptiveEvictionPercentage() < 0 || parameters.getPreemptiveEvictionPercentage() > 100 ? 100 : parameters.getPreemptiveEvictionPercentage());
+        this.capacityPercentageForEviction = (parameters.getPreemptiveEvictionPercentage() <= 0 || parameters.getPreemptiveEvictionPercentage() > 100 ? 100 : parameters.getPreemptiveEvictionPercentage());
         this.evictionStepPercentage =  (parameters.getEvictionStepPercentage() < 0 || parameters.getEvictionStepPercentage() > 100) ? 0 : parameters.getEvictionStepPercentage();
         if (parameters.getThreadPoolSize() != 0) {
             internalThreadService = Executors.newFixedThreadPool(parameters.getThreadPoolSize());
@@ -70,9 +70,8 @@ public abstract class AbstractGenericCache<K, V> extends AbstractMnemosyneCache<
     }
 
     protected void forcedInvalidation() {
-        var ms = this.invalidationInterval;
-        while (ms != 0) {
-            sleepUninterrupted(ms);
+        while (true) {
+            sleepUninterrupted(invalidationInterval);
             invalidateCache();
         }
     }

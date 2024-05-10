@@ -71,7 +71,7 @@ public class LRUCache<K, V> extends AbstractGenericCache<K, V> {
             if (lru != null) {
                 cachedValues.remove(lru);
             } else {
-                return; //Om queue:n är tom då finns det inget att ta bort.
+                break; //Vi skulle väl även kunna returnera? Om queue:n är tom då finns det inget att ta bort
             }
         }
 

@@ -93,9 +93,9 @@ public @interface Cached {
      * <p>
      * The use of this value is up to the implementation of the AbstractMnemosyneCache.
      * <p>
-     * In implementations of AbstractGenericCache, values over 100 or negative are switched to 80. An internal thread periodically checks
+     * In implementations of AbstractGenericCache, values over 100 or less than 0 are switched to 100. An internal thread periodically checks
      * the current size of the cache and evicts if the percentage of the size compared to total capacity is equal or larger than this.
-     * A value of 100 means that only capacity is taken into account.
+     * A value of 100 means that only the capacity is taken into account.
      */
     short preemptiveEvictionPercentage() default 80;
 
