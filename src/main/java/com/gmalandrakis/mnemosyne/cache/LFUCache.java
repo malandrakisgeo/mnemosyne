@@ -1,7 +1,7 @@
 package com.gmalandrakis.mnemosyne.cache;
 
-import com.gmalandrakis.mnemosyne.structures.GenericCacheValue;
 import com.gmalandrakis.mnemosyne.structures.CacheParameters;
+import com.gmalandrakis.mnemosyne.structures.GenericCacheValue;
 
 import java.util.*;
 
@@ -13,7 +13,7 @@ import java.util.*;
  */
 public class LFUCache<K, V> extends AbstractGenericCache<K, V> {
 
-    protected List<K> evictNext;
+    protected final List<K> evictNext;
 
     public LFUCache(CacheParameters parameters) {
         super(parameters);
@@ -21,9 +21,13 @@ public class LFUCache<K, V> extends AbstractGenericCache<K, V> {
     }
 
     @Override
-    public void put(K key, V value) { //We don't check if the value already exists, since MnemoProxy already does this.
-        if (cachedValues.size() >= capacity) {
-            this.evict(); //Ideally, this statement is never reached, and evict() is called by the internal threads before the size exceeds the capacity. But if multiple threads write concurrently in the cache, they will likely prevent the internal threads from evicting it.
+    public void put(K key, V value) {
+        if (key == null || value == null) {
+            return;
+        }
+
+        if (cachedValues.size() >= actualCapacity) {
+            this.evict();
         }
 
         cachedValues.put(key, new GenericCacheValue<>(value));
@@ -60,10 +64,9 @@ public class LFUCache<K, V> extends AbstractGenericCache<K, V> {
             this.setEvictNext();
         }
 
-        if (cachedValues.size() >= capacity * capacityPercentageForEviction / 100f) {
+        if (cachedValues.size() >= actualCapacity) {
             evictNext.forEach(cachedValues::remove);
             evictNext.clear();
-
         }
 
     }
@@ -73,7 +76,7 @@ public class LFUCache<K, V> extends AbstractGenericCache<K, V> {
         A naive way (and the very first implementation of LFU here) would be to have a HashMap of the numbers of hits, along with a Set of the keys that have
         this hit number, and remove all the keys of the least number in the keyset of the HashMap.
 
-        Yet not only this suffers from the obvious problem that it removes most of the values on each eviction (most cache values are only accessed one or two times before evicted),
+        Yet not only this suffers from the obvious problem that it removes most of the values on each eviction (in most applications, cache values are typically only accessed one or two times before evicted),
         but also not only demands thread-safe additions and removals to the HashMap every time we even just access an object of the cache.
         The resulting cache is, as a Greek-speaker would put it, "slower than death".
 
@@ -81,13 +84,12 @@ public class LFUCache<K, V> extends AbstractGenericCache<K, V> {
         Whenever the cache becomes X% full, a list of the values that can soon be evicted is generated based on hits, as well as creation timestamp.
 
      */
-
     protected void setEvictNext() {
         synchronized (evictNext) {
             if (evictNext.isEmpty()) {
-                var tempLimit = Math.max((int) (capacity * evictionStepPercentage / 100f), 1);
-                if (this.cachedValues.size() >= this.capacity) {
-                    tempLimit += (this.cachedValues.size() - this.capacity);
+                var tempLimit = Math.max((int) (actualCapacity * evictionStepPercentage / 100f), 1);
+                if (this.cachedValues.size() >= this.actualCapacity) {
+                    tempLimit += (int) (this.cachedValues.size() - this.actualCapacity);
                 }
 
                 List<K> toBeEvicted = new ArrayList<>(cachedValues.entrySet().stream().filter(this::isExpired).map(Map.Entry::getKey).toList());
@@ -100,7 +102,7 @@ public class LFUCache<K, V> extends AbstractGenericCache<K, V> {
                         .toList();
                 toBeEvicted.addAll(tempLst);
 
-                evictNext = Collections.synchronizedList(toBeEvicted);
+                evictNext.addAll(Collections.synchronizedList(toBeEvicted));
             }
         }
     }
@@ -108,7 +110,7 @@ public class LFUCache<K, V> extends AbstractGenericCache<K, V> {
     @Override
     public void invalidateCache() {
         cachedValues.clear();
-        evictNext = Collections.synchronizedList(new ArrayList<>());
+        evictNext.clear();
     }
 
 

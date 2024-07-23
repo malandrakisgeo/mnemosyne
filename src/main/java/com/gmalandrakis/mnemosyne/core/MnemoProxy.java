@@ -7,10 +7,15 @@ import com.gmalandrakis.mnemosyne.structures.CompoundKey;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 
+/**
+ * A proxy service standing between method invocations and cache implementations.
+ *
+ * @author George Malandrakis (malandrakisgeo@gmail.com)
+ */
 public class MnemoProxy<K, V> {
 
-    private AbstractMnemosyneCache<K, V> cache;
-    private Method forMethod;
+    private final AbstractMnemosyneCache<K, V> cache;
+    private final Method forMethod;
 
     public MnemoProxy(AbstractMnemosyneCache<K,V> cache, Method method) {
         this.cache = cache;
@@ -31,7 +36,6 @@ public class MnemoProxy<K, V> {
         return value;
     }
 
-    //TODO: Mhpws uparxei periptwsh auto na mporei na treksei mono mia fora?
     K deduceKeyFromArgs(Method method, Object[] args) {
         var paramannot = method.getParameterAnnotations();
 
@@ -40,7 +44,7 @@ public class MnemoProxy<K, V> {
         for (Annotation[] annotations : paramannot) {
 
             for (Annotation annotation : annotations) {
-                if (annotation.annotationType().equals(Key.class)) { //Only the first is kept! If more than one @Key-s are present, the others are dismissed
+                if (annotation.annotationType().equals(Key.class)) { //Only the first is kept! If more than one @Key-s are present, the others are disregarded
                     return (K) args[i]; //enall. break outerloop
                 }
             }

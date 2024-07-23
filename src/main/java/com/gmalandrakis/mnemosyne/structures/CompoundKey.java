@@ -10,6 +10,7 @@ import java.util.Arrays;
  * <p>
  * If a CompoundKey exists, it is used as type in the implementation of {@link AbstractCacheValue AbstractCacheValue} .
  * </p>
+ * @author George Malandrakis (malandrakisgeo@gmail.com)
  */
 public class CompoundKey {
 

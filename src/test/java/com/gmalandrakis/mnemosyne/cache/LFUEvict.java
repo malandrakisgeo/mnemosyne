@@ -12,7 +12,7 @@ import java.util.concurrent.TimeUnit;
 import static org.mockito.Mockito.*;
 
 public class LFUEvict {
-    private static final int upperLimit = 1000; //I always looked for an opportunity to use this term in other contexts than math exams
+    private static final int upperLimit = 1000; //I always looked for an opportunity to use this term in other contexts than math problems
     private ExecutorService executorService = Executors.newFixedThreadPool(5);
     private LFUCache<Long, String> lfu;
 
@@ -62,8 +62,7 @@ public class LFUEvict {
     }
 
     @Test
-    public void asynctest() throws InterruptedException {
-      //  executorService = Executors.newFixedThreadPool(5);
+    public void asynctest() {
         executorService.execute(lfu::setEvictNext); //assert no exceptions
         executorService.execute(lfu::setEvictNext); //assert no exceptions
         executorService.execute(lfu::setEvictNext); //assert no exceptions

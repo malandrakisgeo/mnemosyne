@@ -9,6 +9,12 @@ import java.util.HashMap;
 
 import static com.gmalandrakis.mnemosyne.utils.ParameterUtils.annotationValuesToCacheParameters;
 
+/**
+ * A service class used by {@link com.gmalandrakis.mnemosyne.spring.SpringInterceptor SpringInterceptor}.
+ * It generates {@link com.gmalandrakis.mnemosyne.core.MnemoProxy proxy objects} for all the intercepted methods and stores them in a HashMap.
+ *
+ * @author George Malandrakis (malandrakisgeo@gmail.com)
+ */
 public class MnemoService {
     private HashMap<Method, MnemoProxy<?, ?>> proxies = new HashMap<>();
 
@@ -34,9 +40,9 @@ public class MnemoService {
     }
 
     public MnemoProxy generateForMethod(Method method) {
-        var anno = method.getAnnotation(Cached.class);
-        if (anno != null) {
-            return generateInternal(method, anno);
+        var annotation = method.getAnnotation(Cached.class);
+        if (annotation != null) {
+            return generateInternal(method, annotation);
         }
         return null;
     }

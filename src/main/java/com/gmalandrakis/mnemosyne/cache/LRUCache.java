@@ -3,7 +3,6 @@ package com.gmalandrakis.mnemosyne.cache;
 import com.gmalandrakis.mnemosyne.structures.CacheParameters;
 import com.gmalandrakis.mnemosyne.structures.GenericCacheValue;
 
-
 import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -12,24 +11,27 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  *
  * @param <K> The type of the keys used to retrieve the cache elements.
  * @param <V> The type of the values stored in the cache.
+ *
  * @author George Malandrakis (malandrakisgeo@gmail.com)
  */
 public class LRUCache<K, V> extends AbstractGenericCache<K, V> {
-    private final ConcurrentLinkedQueue<K> queue;
+    private ConcurrentLinkedQueue<K> recencyQueue;
 
     public LRUCache(CacheParameters cacheParameters) {
         super(cacheParameters);
-        queue = new ConcurrentLinkedQueue<>();
+        recencyQueue = new ConcurrentLinkedQueue<>();
     }
 
     @Override
-    public void put(K key, V value) { //We don't check if the value already exists, since MnemoProxy already does this.
-        while (cachedValues.size() >= capacity) {
+    public void put(K key, V value) {
+        if (key == null || value == null) {
+            return;
+        }
+        if (cachedValues.size() >= actualCapacity) {
             this.evict(); //Ideally, this statement is never reached, and evict() is called by the internal threads before the size exceeds the capacity. But if multiple threads write concurrently in the cache, they will likely prevent the internal threads from evicting it.
         }
-
-        queue.add(key);
         cachedValues.put(key, new GenericCacheValue<>(value));
+        recencyQueue.add(key);
     }
 
     @Override
@@ -39,8 +41,8 @@ public class LRUCache<K, V> extends AbstractGenericCache<K, V> {
         var cacheVal = this.cachedValues.get(key);
         if (cacheVal != null) {
             toBeReturned = cacheVal.get(); //increase hits & update timestamp
-            queue.remove(key);
-            queue.add(key); //send to tail
+            recencyQueue.remove(key);
+            recencyQueue.add(key); //send to tail
         }
         return toBeReturned;
     }
@@ -48,7 +50,7 @@ public class LRUCache<K, V> extends AbstractGenericCache<K, V> {
     @Override
     public void remove(K key) {
         cachedValues.remove(key);
-        queue.remove(key);
+        recencyQueue.remove(key);
     }
 
     @Override
@@ -58,28 +60,26 @@ public class LRUCache<K, V> extends AbstractGenericCache<K, V> {
 
     @Override
     public K getTargetKey() {
-        return queue.peek();
-
+        return recencyQueue.peek();
     }
 
     @Override
     public void evict() {
-        int eviction = Math.max((int) (capacity * evictionStepPercentage / 100f), 1); //An tuxon to evictionStepPercentage einai mhdeniko, na afairethei toulaxiston ena entry
 
-        for (int i = 0; i < eviction; i++) {
-            var lru = queue.poll(); //Gibt das erste Element zuruck und entfernt es aus der Queue
-            if (lru != null) {
-                cachedValues.remove(lru);
-            } else {
-                break; //Vi skulle väl även kunna returnera? Om queue:n är tom då finns det inget att ta bort
+        if (cachedValues.size() >= this.actualCapacity) {
+            final float eviction = Math.max((totalCapacity * evictionStepPercentage / 100f), 1); //An tuxon to evictionStepPercentage einai mhdeniko, na afairethei toulaxiston ena entry
+
+            for (int i = 0; i < eviction; i++) {
+                var lru = recencyQueue.poll(); //Gibt das erste Element zuruck und entfernt es aus der Queue
+                if (lru != null) {
+                    cachedValues.remove(lru);
+                } else {
+                    break; //Om queue:n är tom då finns det (nog) inget att ta bort. Dubbelkolla och kanske byta till return
+                }
             }
         }
 
-        var expired = cachedValues.entrySet().stream()
-                .filter(this::isExpired)
-                .map(Map.Entry::getKey)
-                .toList();
-        queue.remove(expired);  //Io sono una anatra
-        expired.forEach(cachedValues::remove); //qifsha ropt
+        var expiredValues = cachedValues.entrySet().stream().filter(this::isExpired).map(Map.Entry::getKey).toList(); //Io sono una anatra
+        expiredValues.forEach(this::remove); //qifsha ropt
     }
 }

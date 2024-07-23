@@ -4,9 +4,14 @@ import com.gmalandrakis.mnemosyne.core.MnemoService;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
 
+/**
+ * Method interceptor for Spring.
+ *
+ * @author George Malandrakis (malandrakisgeo@gmail.com)
+ */
 public class SpringInterceptor implements MethodInterceptor {
 
-    private MnemoService mnemoService;
+    private final MnemoService mnemoService;
 
     SpringInterceptor(MnemoService mnemoService) {
         super();
@@ -22,7 +27,7 @@ public class SpringInterceptor implements MethodInterceptor {
         var method = methodInvocation.getMethod();
         var proxy = mnemoService.getProxies().get(method);
         if (proxy == null) {
-            proxy = mnemoService.generateForMethod(method); //Assumes not null, since null is returned whenever a @Cache is absent, and spring only calls this (?) if and only if one is present
+            proxy = mnemoService.generateForMethod(method);
         }
         return proxy.invoke(methodInvocation.getThis(), args);
     }

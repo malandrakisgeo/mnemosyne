@@ -11,16 +11,32 @@ import com.gmalandrakis.mnemosyne.structures.AbstractCacheValue;
  *
  * @param <K> The type of the keys used to retrieve the cache elements.
  * @param <V> The type of the values stored in the cache.
- * @author George Malandrakis (malandrakisgeo@gmail.com)
  * @see com.gmalandrakis.mnemosyne.structures.CacheParameters
  * @see AbstractGenericCache
+ *
+ * @author George Malandrakis (malandrakisgeo@gmail.com)
  */
 public abstract class AbstractMnemosyneCache<K, V> {
 
+    /**
+     * Adds the given key-value pair to the cache.
+     *
+     * @param key
+     * @param value
+     */
     public abstract void put(K key, V value);
 
+    /**
+     * Retrieves a value for a given key.
+     * @param key
+     * @return
+     */
     public abstract V get(K key);
 
+    /**
+     * Removes the key-value pair for a given key.
+     * @param key
+     */
     public abstract void remove(K key);
 
     /**
@@ -39,7 +55,6 @@ public abstract class AbstractMnemosyneCache<K, V> {
 
     /**
      * Removes all the expired or otherwise irrelevant entries.
-     * <p>
      */
     public abstract void evict();
 

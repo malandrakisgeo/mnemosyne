@@ -1,6 +1,7 @@
 package com.gmalandrakis.mnemosyne.structures;
 
 /**
+ * An abstraction of a wrapper-class for the caches values, storing metadata like access-time.
  * @param <V> The type of the cached value.
  * @see GenericCacheValue
  */
@@ -16,6 +17,9 @@ public abstract class AbstractCacheValue<V> {
         hits = 1;
     }
 
+    /**
+     * Returns the stored value
+     */
     public abstract V get();
 
     public abstract void update(V updated);
