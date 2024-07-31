@@ -46,6 +46,7 @@ public @interface Cached {
 
     /**
      * The TTL (Time To Live) in milliseconds, i.e. the time after which the value is no longer relevant.
+     * The countdown starts either on creation, or on the most recent access, depending on the value of {@link com.gmalandrakis.mnemosyne.annotations.Cached#countdownFromCreation}.
      * <p>
      * By default, there is no TTL, which means that the cache entries
      * either live as long as the program, or have lifetimes depending on the algorithm
