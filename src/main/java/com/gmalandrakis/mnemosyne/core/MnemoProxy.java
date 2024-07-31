@@ -22,7 +22,7 @@ public class MnemoProxy<K, V> {
         this.forMethod = method;
     }
 
-
+    @SuppressWarnings("unchecked")
     public V invoke(Object obj, Object... args) throws Throwable {
         var key = deduceKeyFromArgs(forMethod, args);
         var value = cache.get(key);
@@ -35,7 +35,8 @@ public class MnemoProxy<K, V> {
         }
         return value;
     }
-
+    
+    @SuppressWarnings("unchecked")
     K deduceKeyFromArgs(Method method, Object[] args) {
         var paramannot = method.getParameterAnnotations();
 
