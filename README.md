@@ -1,3 +1,5 @@
+### The project is under construction and testing, and not yet ready for production as of 8/2028.
+
 # Mnemosyne
 Mnemosyne is a small and customizable cache library for Java applications.
 
