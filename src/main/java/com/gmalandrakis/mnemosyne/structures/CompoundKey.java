@@ -8,8 +8,8 @@ import java.util.Arrays;
  * <p>
  * The CompoundKey consists of an array of objects. The deep contents of the objects are taken into account for the hash code and the equality.
  * <p>
- * If a CompoundKey exists, it is used as type in the implementation of {@link AbstractCacheValue AbstractCacheValue} .
  * </p>
+ *
  * @author George Malandrakis (malandrakisgeo@gmail.com)
  */
 public class CompoundKey {

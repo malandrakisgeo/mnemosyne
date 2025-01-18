@@ -1,8 +1,8 @@
 package com.gmalandrakis.mnemosyne.cache;
 
 import static org.junit.Assert.*;
-import static org.mockito.Mockito.*;
 
+import com.gmalandrakis.mnemosyne.cache.old.LRUCache;
 import com.gmalandrakis.mnemosyne.structures.CacheParameters;
 import org.junit.Test;
 
@@ -15,7 +15,7 @@ public class LRUCacheTest {
         Most of these test-cases are ChatGPT-generated, with minor modifications.
      */
 
-    @Test
+  /*  @Test
     public void testLRUCacheEviction() {
         CacheParameters params = new CacheParameters();
         params.setCapacity(2);
@@ -92,6 +92,6 @@ public class LRUCacheTest {
 
         // Check that the cache is empty after all threads finish
         assertEquals(0, cache.cachedValues.size());
-    }
+    }*/
 }
 

@@ -1,0 +1,31 @@
+    @Cached(cacheName = "transactionCache", capacity = 1000, timeToLive = 12 * 3600 * 1000, countdownFromCreation = false,
+    preemptiveEvictionPercentage = 85, evictionStepPercentage = 5,  cacheType = LFUCache.class)
+    public List<Transaction> getTransactionsByUser(String id, boolean onlySuccessful) {
+        ...
+    }
+
+    public Transaction updateTransaction(String id, boolean success, String irrelevantString);
+    public void updateTransaction(String id, boolean success);
+    public Transaction updateTransaction(Transaction updatedTransaction);
+    public void updateTransaction(Transaction updatedTransaction, String irrelevantString);
+    public Transaction updateTransaction(String partOfCompoundKey1, String partOfCompoundKey2, String irrelevantString);
+    public void deleteTransaction(Transaction updatedTransaction);
+    public void deleteTransaction(String partOfCompoundKey1, String partOfCompoundKey2, String irrelevantString);
+
+@UpdatesCache(cacheNames={}, identificationFields={"transactionId"} , replacePreemptively=true, alwaysRemove               )
+@Id(fieldName="transactionId")
+@UpdatedValue
+
+replacePreemptively: replace in the cache before running the method (i.e. replace even if the method throws)
+if no @UpdatedValue is given, the return value of the function is used for replacing (error on void). If null is returned, the value with the given id is removed.
+
+Example:
+
+@UpdatesCache(cacheNames={"transactionCache"}, identificationFields={"transactionId"}, replacePreemptively=true)
+Transaction updateTransaction(@Id(fieldName="transactionId") @Key String id, boolean success, String irrelevantString);
+
+@UpdatesCache(cacheNames={"transactionCache"}, identificationFields={"transactionId"}, alwaysRemove=true) //DEN YPARXEI KEY EDW PERA! THA TO VREIS SE OLES TIS CACHES ANEKSARTHTWS KEY KAI THA TO KANEIS UPDATE
+void updateTransaction(@UpdatedValue Transaction updatedTransaction);
+
+@UpdatesCache(cacheNames={"transactionCache"}, alwaysRemove=true)
+void deleteTransaction(Transaction updatedTransaction);

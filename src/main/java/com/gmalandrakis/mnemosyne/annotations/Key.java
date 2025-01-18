@@ -8,9 +8,7 @@ import static java.lang.annotation.ElementType.PARAMETER;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * Used for at most one argument in a {@link com.gmalandrakis.mnemosyne.annotations.Cached @Cached} function.
- * <p>
- * If more than one arguments are annotated as @Key, only the first one is used.
+ * Used for one or more arguments in a {@link com.gmalandrakis.mnemosyne.annotations.Cached @Cached} function.
  * <p>
  * If absent, all arguments are assembled in a {@link com.gmalandrakis.mnemosyne.structures.CompoundKey CompoundKey}
  */

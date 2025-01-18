@@ -1,19 +1,12 @@
-package com.gmalandrakis.mnemosyne.cache;
-
-import com.gmalandrakis.mnemosyne.structures.CacheParameters;
-import com.gmalandrakis.mnemosyne.structures.GenericCacheValue;
-
-import java.util.*;
+package com.gmalandrakis.mnemosyne.cache.old;
 
 /**
  * Implementation of an LFU (Least Frequently Used) cache.
  *
- * @param <K> The type of the keys used to retrieve the cache elements.
- * @param <V> The type of the values stored in the cache.
  */
-public class LFUCache<K, V> extends AbstractGenericCache<K, V> {
+public class LFUCache{//<K, V> extends AbstractGenericCache<K, V> {
 
-    protected final List<K> evictNext;
+    /*protected final List<K> evictNext;
 
     public LFUCache(CacheParameters parameters) {
         super(parameters);
@@ -84,7 +77,7 @@ public class LFUCache<K, V> extends AbstractGenericCache<K, V> {
         Whenever the cache becomes X% full, a list of the values that can soon be evicted is generated based on hits, as well as creation timestamp.
 
      */
-    protected void setEvictNext() {
+ /*   protected void setEvictNext() {
         synchronized (evictNext) {
             if (evictNext.isEmpty()) {
                 var tempLimit = Math.max((int) (actualCapacity * evictionStepPercentage / 100f), 1);
@@ -112,6 +105,6 @@ public class LFUCache<K, V> extends AbstractGenericCache<K, V> {
         cachedValues.clear();
         evictNext.clear();
     }
-
+*/
 
 }

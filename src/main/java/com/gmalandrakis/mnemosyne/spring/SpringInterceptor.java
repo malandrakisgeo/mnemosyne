@@ -1,5 +1,6 @@
 package com.gmalandrakis.mnemosyne.spring;
 
+import com.gmalandrakis.mnemosyne.annotations.Cached;
 import com.gmalandrakis.mnemosyne.core.MnemoService;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
@@ -13,7 +14,7 @@ public class SpringInterceptor implements MethodInterceptor {
 
     private final MnemoService mnemoService;
 
-    SpringInterceptor(MnemoService mnemoService) {
+    public SpringInterceptor(MnemoService mnemoService) {
         super();
         this.mnemoService = mnemoService;
     }
@@ -21,14 +22,14 @@ public class SpringInterceptor implements MethodInterceptor {
     @Override
     public Object invoke(MethodInvocation methodInvocation) throws Throwable {
         var args = methodInvocation.getArguments();
-        if (args.length == 0) { //Sanity check preventing exceptions in case of a forgotten @Cache in a function without arguments.
-            return methodInvocation.proceed();
-        }
         var method = methodInvocation.getMethod();
-        var proxy = mnemoService.getProxies().get(method);
-        if (proxy == null) {
-            proxy = mnemoService.generateForMethod(method);
+        var targetObject = methodInvocation.getThis();
+
+        if (method.getAnnotation(Cached.class) != null) {
+            return mnemoService.fetchFromCacheOrInvokeMethodAndUpdate(method, targetObject, args);
+        } else {
+            return mnemoService.invokeMethodAndUpdate(method, targetObject, args);
         }
-        return proxy.invoke(methodInvocation.getThis(), args);
+
     }
 }

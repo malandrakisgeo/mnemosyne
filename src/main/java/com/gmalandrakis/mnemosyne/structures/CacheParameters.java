@@ -25,6 +25,10 @@ public class CacheParameters {
 
     private short evictionStepPercentage;
 
+    private boolean handleCollectionKeysSeparately;
+
+    private boolean returnsCollection;
+
 
     public String getCacheName() {
         return cacheName;
@@ -96,5 +100,21 @@ public class CacheParameters {
 
     public void setEvictionStepPercentage(short evictionStepPercentage) {
         this.evictionStepPercentage = evictionStepPercentage;
+    }
+
+    public boolean isHandleCollectionKeysSeparately() {
+        return handleCollectionKeysSeparately;
+    }
+
+    public void setHandleCollectionKeysSeparately(boolean handleCollectionKeysSeparately) {
+        this.handleCollectionKeysSeparately = handleCollectionKeysSeparately;
+    }
+
+    public boolean isReturnsCollection() {
+        return returnsCollection;
+    }
+
+    public void setReturnsCollection(boolean returnsCollection) {
+        this.returnsCollection = returnsCollection;
     }
 }

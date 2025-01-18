@@ -1,0 +1,378 @@
+    Transaction: id, userid, completed, dateInitiated, dateCompleted, notes
+
+    @Cached(cacheName = "getById", capacity = 1000, timeToLive = 12 * 3600 * 1000, countdownFromCreation = false,
+        preemptiveEvictionPercentage = 85, evictionStepPercentage = 5,  cacheType = LFUCache.class)
+        public Transaction getById(String id) {
+...
+        }
+
+
+    @Cached(cacheName = "getByUser", capacity = 1000, timeToLive = 12 * 3600 * 1000, countdownFromCreation = false,
+    preemptiveEvictionPercentage = 85, evictionStepPercentage = 5,  cacheType = LFUCache.class)
+    public List<Transaction> getTransactionsByUser(String userId, boolean onlyCompleted) {
+        ...
+    }
+
+    @Cached(cacheName = "getByUserWithIrrelevantArgument", capacity = 1000, timeToLive = 12 * 3600 * 1000, countdownFromCreation = false,
+    preemptiveEvictionPercentage = 85, evictionStepPercentage = 5,  cacheType = LFUCache.class)
+    public List<Transaction> getTransactionsByUser(@Key String userId, @Key boolean onlyCompleted, String irrelevant) {
+        ...
+    }
+
+
+
+    @Cached(cacheName = "getBetweenDates", capacity = 1000, timeToLive = 12 * 3600 * 1000, countdownFromCreation = false,
+        preemptiveEvictionPercentage = 85, evictionStepPercentage = 5,  cacheType = LFUCache.class)
+        public List<Transaction> getTransactions(Date fromDate, Date toDate, boolean onlyCompleted) {
+            ...
+            /*
+                We may have a transaction being processed (i.e. not completed). We would like to have it in the cache once it is completed in a given date
+            */
+        }
+
+
+
+    @Cached(cacheName = "transactionCacheByIds", capacity = 1000, timeToLive = 12 * 3600 * 1000, countdownFromCreation = false,
+    preemptiveEvictionPercentage = 85, evictionStepPercentage = 5,  cacheType = LFUCache.class)
+    public List<String> getTransactionIdsByUser(String userId, boolean onlyCompleted, String otherData) {
+        ...
+    }
+
+
+    @Cached(cacheName = "otherCacheIds", capacity = 1000, timeToLive = 12 * 3600 * 1000, countdownFromCreation = false,
+        preemptiveEvictionPercentage = 85, evictionStepPercentage = 5,  cacheType = LFUCache.class)
+        public List<String> getTransactionIdsbyDate(Date fromDate, Date toDate, boolean onlyCompleted) {
+            ...
+        }
+
+
+
+
+
+
+
+
+public void saveTransaction(Transaction transaction)
+public void deleteTransaction(Transaction transaction)
+public void update(String id, boolean completed, String irrelevant)
+public void updateTransaction(String id, boolean successful, Date timeCompleted, String otherData, String notToBeSaved)
+public void updateCompletionTimeForTransaction(String id, Date timeCompleted)
+public Transaction updateTransaction(String id, Date timeCompleted, String irrelevantId )
+public void saveTransactions(List<Transaction> transaction)
+public void deleteTransactions(List<Transaction> transaction)
+
+vasika, ola sugklinoun sto oti mono duo periptwseis tha einai apodektes: 1. autes pou exoun to updatedValue ws autousio orisma, 2. Autes pou to epistrefoun.
+Kathe entity pou tha einai gia update, tha exei ena id (h enan sunduasmo pediwn pou kathistoun ena id athroistika), kai auto tha to pairnei ws orisma to annotation.
+P.x. @UpdatesCache(name="getByUser", idName="transactionId") h  @UpdatesCache(name="getByUser", compoundId={"pedio1", "pedio2"})
+
+
+
+1. replacePreemptively: replace in the cache before running the method (i.e. replace even if the method throws)
+if no @UpdatedValue is given, the return value of the function is used for replacing (error on void). If null is returned, the value with the given id is removed.
+2.Dunatothta gia update ths cache prin, h meta thn epituxh oloklhrwsh klhshs ths sunarthshs
+
+OMWS
+
+Uparxei ena themataki. Uparxoun dyo eidh update:
+A. Update epi tou Key (p.x. enas xrhsths ekane ena neo transaction, opote vriskoume to key tou kai prosthetoume to neo transaction)
+B. Update epi twn YPARXOUSWN TIMWN (oi periptwseis pou kaluptoume panw).
+
+Logw ths B periptwshs, mhpws einai kalutero na uparxei enas endiamesos pinakas? Dld, pes oti se ena transaction (p.x. mia aithsh), emplekontai duo xrhstes.
+An kati allazei sto transaction, tha prepei na psaksoume th cache gia duo keys (duo ids xrhstwn) kai na allaksoume ekei.
+Moiazei apeirws anwtero na exoume ta cache-entries na einai to id tou transaction, kai na fetcharoume to transaction me vash auto to id, wste kai na
+to enhmerwnoume mia kai eksw gia olous tous xrhstes. Etsi, anti na psaksoume to transaction gia olous tous emplekomenous xrhstes kai na to allaksoume
+gia ton kathenan ksexwrista, tha to allaksoume se mono ena shmeio. Oi caches gia tous emplekomenous users tha exoun automata th nea timh, afou to key tha einai to userId, kai to value to transactionId
+pou me th seira tou tha einai key se ena HashMap<String, Transaction>. E gjegje??
+
+
+
+
+
+othercases:
+list ws parametros
+
+
+
+@UpdatesCache(name="getById", addIfAbsent=true)
+@UpdatesCache(name="getBySeller", keys={"sellerId"}, targetObjectKeys=true, addIfAbsent=true)
+@UpdatesCache(name="getBetweenDates", keys={"dateStarted", "dateCompleted"}, targetObjectKeys=true)
+@UpdatesCache(name="getPendingTransactions", removeValueFromCollection=true)
+public void saveCompletedTransaction(@UpdatedValue Transaction transaction)
+
+@UpdatesCache(name="getBySeller", keys={"sellerId"}, addIfAbsent=true)
+@UpdatesCache(name="getById", keys={"id"}, addIfAbsent=true)
+@UpdatesCache(name="getPendingTransactions", addIfAbsent=true)
+public Transaction createAndSavePendingTransaction(@UpdateKey(name="id") UUID uuid,
+@UpdateKey(name="sellerId") String sellerId,
+  @UpdateKey(name="buyerId") String buyerId);//assume logic for the other fields implemented in the function
+
+
+
+
+
+
+
+
+
+
+
+The keys will either be present as fields in the @UpdatedValue or returned value, or will be annotated as @UpdateKey if
+they are the arguments.
+
+
+THE PROBLEM
+
+Implementing a simple cache is trivial. It can be as simple as implementing a FIFO structure you check before calling a function, and add
+after calling if nothing was found.
+Implementing an advanced cache (concurrent, distributes, updating, or deleting old values automatically) is a big deal.
+Especially when you want to handle even Collections of objects.
+
+Let's say we work on a Java class with methods like this:
+
+Transaction getTransactionById(UUID transactionId);
+List<Transaction> getTransactionsBySeller(String username);
+List<Transaction> getTransactionsByBuyerAndSeller(String buyerId, String sellerId);
+List<Transaction> getTransactionsCompletedBetweenDates(Date from, Date to);
+List<Transaction> getPendingTransactions();
+List<Transaction> getTransactionByIds(Set<UUID> transactionIds); --
+
+and other methods that add transactions or update them.
+
+Suppose we need to run such methods extremely often, and we need fetch the transactions from a remote database that is slow as hell,
+so we need to rely on a cache as much as possible.
+
+What happens if a transaction is updated, e.g. completed or cancelled?
+
+If all the aforementioned methods are cached, we could have an old version of the transaction in
+all four Lists: one for getTransactionsByUser, one for getTransactionsByBuyerAndSeller, one for getTransactionsCompletedBetweenDates,
+and one in getPendingTransactions.
+We want a cache that automatically updates the value in the three first lists, and removes it from the fourth, and does it fast.
+
+This isn't a problem with a trivial solution.
+
+And it is even more complex when you want an abstraction allowing you to use the same code for other types besides Transaction.
+
+
+A POSSIBLE SOLUTION... LEADING TO OTHER CHALLENGES
+
+In this project, we do our very best to solve the problem by creating what is essentially an in-memory database of value pools for every cached type,
+mapped by IDs.
+The caches for each method do not store the values themselves, but their associated IDs.
+Whenever a method is invoked with some arguments, those are used as a key that is mapped to IDs instead of objects.
+The objects are then retrieved and returned from the ValuePool via their IDs.
+Whenever an object is to be updated, we just remove the old version and put the newer one for the same ID, thereby simplifying the
+update of multiple caches at the same time.
+
+In the previous example, we would have a ValuePool with all cached transactions mapped by their unique IDs.
+Whenever a transaction is updated, the cache only needs to invalidate the old version and replace it with the newer one:
+ we will only update one place instead of three.
+ The caches of the methods are only linked to IDs instead of transaction objects, so we won't need to update something there as long as
+an object is not deleted.
+
+But then we have other problems that arise.
+
+What will the architecture of such a cache look like?
+Where will the job begin and how?
+How will we get all this work with just some annotations?
+What is an ID and how would we handle types that lack particular IDs?
+How will we get this to work with at least a Java framework like Spring, let alone with Java projects in general?
+How should we synchronize reads and/or writes on a distributed and multithreaded environment?
+How do we avoid memory leaks? If we evict all the caches containing a particular ID, how will we know it is time to get rid of the object in the ValuePool?
+How do we make sure we have no "zombie" values, e.g. if we delete a user along with their transactions?
+How can we make sure we will be able to use this in a distributed environment?
+
+
+Solving these problems is both logically and technically challenging.
+
+I like challenges.
+So I made an attempt to solve the problems above.
+
+
+
+HOW I BEGAN
+
+This may be disappointing to  some readers, but instead of coming up with a completely de novo solution, I decided
+to reutilize the code of an older and simpler cache library I wrote: mnemosyne.
+
+Mnemosyne was simple. Far from a hello world, but simple.
+
+The general idea was that the programmer would be able to use just a couple of annotations (namely @Cache and @Key)
+and cache the results of methods for some time. There were provided implementations of classic caching algorithms,
+including FIFO,LFU, and LRU.*, but the programmer was able to implement their own algorithms just by implementing an abstract
+class and providing it as a field in the @Cache annotation.
+
+Mnemosyne had some serious limitations that become pretty obvious as soon as one starts reading through the code:
+it couldn't work on a distributed environment, and didn't provide a way to automatically update the data. You had to wait for
+it to expire or manually remove it and put the latest one yourself.
+ The collection handling was also bad: if your methods returned Lists or Sets,
+they were cached as a whole. If two lists of 200 items differed by just one item, the cache
+ wrapped them in two objects implementing AbstractCacheValue, and stored both of them as
+they were, resulting to 400 items in memory instead of 201 and a map.
+
+tldr, mnemosyne was not a library suitable for serious use.
+
+
+
+
+NECESSITIES AND LUXURIES
+
+
+
+
+
+
+
+
+
+
+21/12
+surprise, surprise!
+I thought I solved the problem with IDs (by searching for a declared "id" field in the target type, alt. for an @Id annotation if not found,
+otherwise the object hash with a
+warning). But what I didn't take into account was the proxy objects created by numerous frameworks and libraries:
+Hibernate, for instance, wraps the entity objects around proxy objects by default. The proxy objects have the fields of the target objects
+(with null values on my implementation), along with an extra field referring to an object that contains the target entity as a field.
+
+As you may guess, it is extremely tough to make an abstraction that covers *all* these cases for all frameworks and libraries:
+there are millions of ways to wrap a target object.
+
+Theoretically, you could go through all the fields of all referred objects (incl. supertypes)
+until you find the type you are interested in, but could is far from a synonym to should: what happens if the type
+you found is just a reference to an older cached object, or a fake instance with all values set to null (like in my case), or one value out of many?
+
+This is a problem I won't even attempt to solve. The closest thing to a solution is to explicitly mention that the cache may not (i.e. will not)
+work as intended if wrapper objects are in use. A future solution is to provide the developer a way of using their own implementations
+of deduceId().
+
+
+
+27-28/12
+I realized I had not taken into account a very important subcase: methods that are called with a collection (e.g. list) of ids
+and return a collection of objects.
+
+So far I had only worked on single-key caches, i.e. caches that take one key or combination of them and return an object
+or a collection of objects. If the key was a collection of IDs, mnemo would cache the whole collection as the key
+and would return something via the cache if and only if the very same collection was used.
+Which means that if you called the same method with a collection that differs in a single object, the cache would return null, and
+the underlying function would be called. Quite a useless cache if one uses collections of IDs often.
+
+A caching system might do something like this:
+1. Find the cached values corresponding to available keys, and keep track of the keys that return nothing
+2. Call the underlying method with the keys whose values were not found in the cache
+3. Cache the new values
+4. Return a combination of the previously found and the new values.
+
+But this introduces a bunch of other problems.
+
+To begin with, what happens if e.g. the length of the key collection plays some role for the underlying method, and
+we do not want to call it with half of them? The "keys" might be e.g. a list of XY coordinates, and
+the underlying function would likely throw an error if it was called with an odd number of them, not to mention
+it would return gibberish if it was called with an even number of wrong coordinates.
+It should be up to the developer if the cache will return a combination of the hits or not.
+We need at least an extra flag for this.
+
+Then you have a mapping issue. If calling a function with e.g. eight keys, and it returns a collection of seven objects,
+how do you know which key did not return a value?
+The closest thing to a solution would be to call the function multiple times, wrapping the key as a collection,
+and create a map yourself. But this can (aka will) make the cache woefully slow, potentially even economically expensive.
+Imagine calling multiple times an pay-per-request service you rely on.
+
+For the first time since I started working on this, and even though I have already written code that partially mitigates the problem,
+I will check how other cache libraries solve it (I ain't asking chatGPT when I am not in a hurry).
+And I would bet they don't.
+
+
+
+
+Fun fact:
+If the underlying method returned null for a key, mnemosyne will *always* call the underlying function
+for all subsequent calls for this key. That means, a null value cannot be cached.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+LIMITATIONS
+
+All collection handling is limited to Lists, Sets, and abstract Collections.
+If a Method returns a concrete implementation of e.g. List, like ArrayList, mnemo will throw an exception
+Whenever a cached method returns a collection of objects, this will be a Collection, a List, or a Set.
+Same applies when collections are used as keys.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+VERSION 1
+
+@UpdatesCache(name="getBySeller", keys={"sellerId"}, addIfAbsent=true)
+@UpdatesCache(name="getById", keys={"id"}, addIfAbsent=true)
+@UpdatesCache(name="getPendingTransactions", addIfAbsent=true)
+public Transaction createPendingTransaction(@UpdateKey(name="id") UUID uuid)
+
+
+@UpdatesCache(name="getBySeller", keys={"sellerId"}, addIfAbsent=true)
+@UpdatesCache(name="getById", fieldNameKeys={"id"}, addIfAbsent=true)
+@UpdatesCache(name="getPendingTransactions", addIfAbsent=true)
+public Transaction createPendingTransaction(Transaction pendingTransaction)
+
+
+
+
+
+
+
+
+
+@Cached(cacheName = "pendingTransactionCache", capacity = 1000, timeToLive = 12 * 3600 * 1000, countdownFromCreation = false, preemptiveEvictionPercentage = 85, evictionStepPercentage = 5,  cacheType = LFUCache.class)
+public List<Transaction> getPendingTransactionsByUser(String userId);
+
+@Cached(cacheName = "completedTransactionCache", capacity = 1000, timeToLive = 12 * 3600 * 1000, countdownFromCreation = false, preemptiveEvictionPercentage = 85, evictionStepPercentage = 5,  cacheType = LFUCache.class)
+public List<Transaction> getCompletedTransactionsByUser(String userId);
+
+@UpdatesCache(name="getTransactionsBySeller", keys={"userId"}, targetObjectKeys=true)
+@UpdatesCache(name="completedTransactionCache", keys={"userId", "isCompleted"}, targetObjectKeys=true, conditionalAdd="isCompleted", conditionalRemove="!isCompleted")
+@UpdatesCache(name="pendingTransactionCache", keys={"userId", "isCompleted"}, targetObjectKeys=true, conditionalAdd="!isCompleted", conditionalRemove="isCompleted")
+@UpdatesCache(name="getPendingTransactions", removeValueFromCollection=true)
+public void completeTransaction(@UpdatedValue Transaction transaction)
+
+
+
+
+@UpdateKey(name="sellerId") String sellerId,
+@UpdateKey(name="buyerId") String buyerId);//assume logic for the other fields implemented in the function
+
+
+        /*
+            -1. Des an uparxei @UpdatedValue. An uparxei, pare to.
+            An oxi, pare auto pou epistrefei h methodos. Thewroume pws den einai void giati exoun hdh ginei autoi oi elegxoi (kane apla assert).
+            0. Vres ola ta @UpdateKey sta arguments, kai kane ena map onomatwn-timwn.
+            1. Vres ola ta @UpdateCache.
+            2. Gia kathe updateCache, vres ta keys tou an tuxon uparxoun.
+                An den exei, des an to targetMethod exei zero arguments. An den exei, exception.
+                An exei, fetchare values apo to map tou vhmatos 0, kai kane compoundKey me auta.
+                An kapoio key den to vreis ekei, psakse to sta fields tou target object, eite auto einai @UpdatedValue eite auto pou epistrefei h methodos.
+
+
+
+         */

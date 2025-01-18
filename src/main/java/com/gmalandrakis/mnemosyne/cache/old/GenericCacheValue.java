@@ -1,4 +1,4 @@
-package com.gmalandrakis.mnemosyne.structures;
+package com.gmalandrakis.mnemosyne.cache.old;
 
 public class GenericCacheValue<V> extends AbstractCacheValue<V> {
 

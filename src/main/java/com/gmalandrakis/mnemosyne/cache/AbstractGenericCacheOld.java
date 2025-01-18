@@ -1,7 +1,7 @@
 package com.gmalandrakis.mnemosyne.cache;
 
 import com.gmalandrakis.mnemosyne.structures.CacheParameters;
-import com.gmalandrakis.mnemosyne.structures.IdWrapper;
+import com.gmalandrakis.mnemosyne.cache.old.IdWrapperOld;
 import com.gmalandrakis.mnemosyne.core.ValuePool;
 import com.gmalandrakis.mnemosyne.utils.GeneralUtils;
 
@@ -11,12 +11,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public abstract class AbstractGenericCache<K, ID, V> extends AbstractMnemosyneCache<K, ID, V> {
+public abstract class AbstractGenericCacheOld<K, ID, V> extends AbstractMnemosyneCache<K, ID, V> {
     final ExecutorService internalThreadService;
 
     final ValuePool<ID, V> valuePool;
 
-    final ConcurrentHashMap<K, IdWrapper<ID>> keyIdMap;
+    final ConcurrentHashMap<K, IdWrapperOld<ID>> keyIdMap;
 
     final String name;
     final boolean countdownFromCreation;
@@ -30,7 +30,7 @@ public abstract class AbstractGenericCache<K, ID, V> extends AbstractMnemosyneCa
     final boolean returnsCollection;
 
 
-    public AbstractGenericCache(CacheParameters parameters, ValuePool<ID, V> valuePool) {
+    public AbstractGenericCacheOld(CacheParameters parameters, ValuePool<ID, V> valuePool) {
         super();
         this.keyIdMap = new ConcurrentHashMap<>();
         this.valuePool = valuePool;
@@ -52,7 +52,7 @@ public abstract class AbstractGenericCache<K, ID, V> extends AbstractMnemosyneCa
         setInternalThreads();
     }
 
-    public abstract void putAll(K key, Map<ID, V> value);
+    public abstract void putAll(K key, Map<ID,V> ídValueMap);
 
     public abstract void put(K key, ID id, V value);
 
@@ -116,9 +116,9 @@ public abstract class AbstractGenericCache<K, ID, V> extends AbstractMnemosyneCa
     /**
      * Checks if the particular entry is expired.
      */
-    protected boolean isExpired(Map.Entry<K, IdWrapper<ID>> entry) {
+    protected boolean isExpired(Map.Entry<K, IdWrapperOld<ID>> entry) {
         long creationOrAccessTime = countdownFromCreation ? entry.getValue().getCreatedOn() : entry.getValue().getLastAccessed();
-        return (System.currentTimeMillis() - creationOrAccessTime) > this.timeToLive;    //System.currentTimeMillis() is very slow on Linux though very fast on Windows, but System.nanoTime() the opposite.
+        return (System.currentTimeMillis() - creationOrAccessTime) > this.timeToLive;         //System.currentTimeMillis() is very slow on Linux though very fast on Windows, but System.nanoTime() the opposite.
     }
 
     /**

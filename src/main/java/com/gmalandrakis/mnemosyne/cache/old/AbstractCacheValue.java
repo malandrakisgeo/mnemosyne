@@ -1,4 +1,4 @@
-package com.gmalandrakis.mnemosyne.structures;
+package com.gmalandrakis.mnemosyne.cache.old;
 
 /**
  * An abstraction of a wrapper-class for the caches values, storing metadata like access-time.
