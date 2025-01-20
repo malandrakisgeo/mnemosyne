@@ -75,24 +75,24 @@ public class MnemoProxy<K, ID, V> {
         if (key == null || idValueMap == null || updateCache == null) {
             return;
         }
-       // this.executorService.execute(() -> { //TODO: Decide whether this should run in another thread to avoid delays
-            if (updateCache.removeValueFromCollection()) {
-                //TODO
+        // this.executorService.execute(() -> { //TODO: Decide whether this should run in another thread to avoid delays
+        if (updateCache.removesValueFromSingleCollection()) {
+            //TODO
+            return;
+        }
+
+        if (updateCache.removesValueFromAllCollections()) {
+            //todo
+            return;
+        }
+
+            if (returnsCollections) {
+                cache.putAll(key, idValueMap);
+            } else {
+                var singleKey = idValueMap.keySet().stream().toList().get(0);
+                cache.put(key, singleKey, valuePool.getValue(singleKey));
             }
 
-            if (updateCache.removeValueFromAllCollections()) {
-                //todo
-            }
-
-            if (updateCache.addIfAbsent()) {
-                if (cache.get(key) == null)
-                    if (returnsCollections) {
-                        cache.putAll(key, idValueMap);
-                    } else {
-                        var singleKey = idValueMap.keySet().stream().toList().get(0);
-                        cache.put(key, singleKey, valuePool.getValue(singleKey));
-                    }
-            }
         //});
     }
 
@@ -125,7 +125,8 @@ public class MnemoProxy<K, ID, V> {
     private Collection<V> getMultiple(CompoundKey compoundKey, Object invocationTargetObject, Object... args) {
         var value = invokeUnderlyingMethod(invocationTargetObject, args);
         if (value != null) {
-            assert (Collection.class.isAssignableFrom(value.getClass()));
+           // assert (Collection.class.isAssignableFrom(value.getClass()));
+            assert(value instanceof Collection);
             var valueCollection = (Collection<V>) value;
             var map = (Map<ID, V>) GeneralUtils.deduceId(value);
             cache.putAll((K) compoundKey, map);
@@ -137,9 +138,9 @@ public class MnemoProxy<K, ID, V> {
     //TODO: FFS, improve this cowboy-coded clusterfuck or remove it altogether.
     private Collection<V> getMultipleSpecial(CompoundKey compoundKey, Object invocationTargetObject, Object... args) {
         assert (specialCollectionHandlingEnabled && compoundKey.getKeyObjects().length == 1
-                && Collection.class.isAssignableFrom(compoundKey.getKeyObjects()[0].getClass()) && args.length == 1); //A very specific but very common subcase: calling a repository or rest-api method with a single Collection of IDs as argument
-        var returnTypeIsList = List.class.isAssignableFrom(forMethod.getReturnType());
-        var keyTypeIsList = List.class.isAssignableFrom(compoundKey.getKeyObjects()[0].getClass()); //Reminder that the Collection here may be only Set or List.
+                && compoundKey.getKeyObjects()[0] instanceof Collection && args.length == 1); //A very specific but very common subcase: calling a repository or rest-api method with a single Collection of IDs as argument
+        var returnTypeIsList =  List.class.isAssignableFrom(forMethod.getReturnType());
+        var keyTypeIsList = compoundKey.getKeyObjects()[0] instanceof List; // //Reminder that the Collection here may be only Set or List.
         var keys = (List<K>) compoundKey.getKeyObjects()[0]; //In this case, the compoundKey is not the key itself: it contains a Collection of the actual keys instead, created from the arguments given, treated here as List.
         List<K> failedKeys = Collections.synchronizedList(new ArrayList<K>()); //a list with the keys that did not return a value, i.e. returned empty collection or null.
         var totalResult = new ConcurrentHashMap<K, V>();
@@ -164,7 +165,8 @@ public class MnemoProxy<K, ID, V> {
                                 if (value == null) {
                                     totalResult.put(failedKey, null);
                                 } else {
-                                    assert (Collection.class.isAssignableFrom(value.getClass())); //TODO: Add this to generalControls and delete here.
+                                   // assert (Collection.class.isAssignableFrom(value.getClass())); //TODO: Add this to generalControls and delete here.
+                                    assert(value instanceof Collection);
                                     var valueCollection = (Collection<V>) value;
                                     if (valueCollection.isEmpty()) {
                                         //Add nothing to the cache or the result. It is apparent that the method is "null-aversive" and just ignores the values that were not found. So just do the same.

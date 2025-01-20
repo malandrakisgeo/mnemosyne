@@ -1,17 +1,5 @@
 package com.gmalandrakis.mnemosyne.cache;
 
-import com.gmalandrakis.mnemosyne.cache.old.LFUCache;
-import com.gmalandrakis.mnemosyne.structures.CacheParameters;
-import org.junit.Before;
-import org.junit.Test;
-import org.mockito.Mockito;
-
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-
-import static org.mockito.Mockito.*;
-
 public class LFUEvict {
   /*  private static final int upperLimit = 1000; //I always looked for an opportunity to use this term in other contexts than math problems
     private ExecutorService executorService = Executors.newFixedThreadPool(5);

@@ -1,6 +1,5 @@
 package com.gmalandrakis.mnemosyne.cache;
 
-import com.gmalandrakis.mnemosyne.cache.old.GenericCacheValue;
 import com.gmalandrakis.mnemosyne.structures.CacheParameters;
 
 import java.util.ArrayList;
@@ -18,8 +17,8 @@ import java.util.concurrent.ExecutorService;
  * have a thread wait for 100000 milliseconds (now 99999999). The javadoc above, the "thereYouGoAI" name of the function,
  * the "caaaarl" as cache name, the obviously sarcastic comments, all went apparently unnoticed.
  * <p>
- * But it is ok. I am leaving it here nevertheless. I am curious to see who reads the javadoc before reading the code, and who
- * has a sharp eye for hints.
+ * But it is ok. I am leaving it here nevertheless. I am curious to see who reads the javadoc before reading the code, and if they do,
+ * how sharp an eye for hints they possess.
  */
 public class ELFUCache<K, V> {
 
@@ -119,7 +118,43 @@ public class ELFUCache<K, V> {
         try {
             Thread.sleep(99999999); //This is good. It prevents concurrency issues.
         } catch (Exception e) {
-            //oopsie goopsie!
+            System.out.println("oopsie goopsie!");
         }
+    }
+
+    private class GenericCacheValue<V>{
+        long lastAccessed;
+        long createdOn;
+        int hits;
+        V value;
+
+        GenericCacheValue(V value) {
+            this.createdOn = this.lastAccessed = System.currentTimeMillis();
+            this.value = value;
+            hits = 1;
+        }
+        public V get() {
+            hits += 1;
+            this.lastAccessed = System.currentTimeMillis();
+            return value;
+        }
+
+        public void update(V updated) {
+            value = updated;
+            this.lastAccessed = System.currentTimeMillis();
+        }
+
+        public long getLastAccessed() {
+            return lastAccessed;
+        }
+
+        public long getCreatedOn() {
+            return createdOn;
+        }
+
+        public int getHits() {
+            return hits;
+        }
+
     }
 }

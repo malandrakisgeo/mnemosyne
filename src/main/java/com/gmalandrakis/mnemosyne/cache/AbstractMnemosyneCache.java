@@ -1,7 +1,10 @@
 package com.gmalandrakis.mnemosyne.cache;
 
+import com.gmalandrakis.mnemosyne.structures.IdWrapper;
+
 import java.util.Collection;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * A general description of the Caches used by mnemosyne.
@@ -15,8 +18,13 @@ import java.util.Map;
  * @see AbstractGenericCache
  */
 public abstract class AbstractMnemosyneCache<K, ID, V> {
+    final ConcurrentHashMap<K, IdWrapper<ID>> keyIdMapper = new ConcurrentHashMap<>();
 
-    //TODO: write documentation
+    /**
+     *
+     * @param key
+     * @param ídValueMap
+     */
     public abstract void putAll(K key, Map<ID,V> ídValueMap);
 
     /**

@@ -2,8 +2,7 @@ package com.gmalandrakis.mnemosyne.core;
 
 import com.gmalandrakis.mnemosyne.structures.CacheValue;
 
-import java.util.Collection;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class ValuePool<ID, T> {
@@ -30,7 +29,6 @@ public class ValuePool<ID, T> {
     }
 
     public void put(ID id, T value, boolean newCache) {
-        System.out.println(newCache);
         var cachedValue = this.valueMap.get(id);
         if (cachedValue == null)
             this.valueMap.put(id, new CacheValue<>(value));
@@ -42,23 +40,27 @@ public class ValuePool<ID, T> {
         }
     }
 
-    public void removeOrDecreaseNumberOfUsesForIds(Collection<ID> ids) {
-        ids.forEach(this::removeOrDecreaseNumberOfUsesForId);
+    public Map<ID, Integer> removeOrDecreaseNumberOfUsesForIds(Collection<ID> ids) {
+        var numberOfUsesPerIdMap = new HashMap<ID, Integer>();
+        ids.forEach(id->{
+            numberOfUsesPerIdMap.put(id, removeOrDecreaseNumberOfUsesForId(id));
+        });
+        return numberOfUsesPerIdMap;
     }
 
-    public void removeOrDecreaseNumberOfUsesForId(ID id) {
+    public Integer removeOrDecreaseNumberOfUsesForId(ID id) {
         var cachedValue = valueMap.get(id);
         if (cachedValue == null) {
-            return;
+            return 0;
         }
         if (cachedValue.decreaseNumberOfUses() == 0) {
             valueMap.remove(id);
         }
+        return cachedValue.getNumberOfUses();
     }
 
     public int getSize() {
         return this.valueMap.size();
     }
-
 
 }

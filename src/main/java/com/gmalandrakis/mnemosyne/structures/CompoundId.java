@@ -13,7 +13,6 @@ public class CompoundId {
         this.idObjects = idObjects;
     }
 
-
     public Object[] getIdObjects() {
         return idObjects;
     }

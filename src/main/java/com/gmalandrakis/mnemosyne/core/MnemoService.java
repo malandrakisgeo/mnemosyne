@@ -2,15 +2,17 @@ package com.gmalandrakis.mnemosyne.core;
 
 import com.gmalandrakis.mnemosyne.annotations.*;
 import com.gmalandrakis.mnemosyne.cache.AbstractMnemosyneCache;
+import com.gmalandrakis.mnemosyne.exception.MnemosyneInitializationException;
+import com.gmalandrakis.mnemosyne.exception.MnemosyneRuntimeException;
+import com.gmalandrakis.mnemosyne.exception.MnemosyneUpdateException;
 import com.gmalandrakis.mnemosyne.structures.CacheParameters;
+import com.gmalandrakis.mnemosyne.structures.CompoundKey;
 import com.gmalandrakis.mnemosyne.utils.GeneralUtils;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -40,7 +42,7 @@ public class MnemoService {
         }
         Object finalObject = object;
         // threadPool.execute(() -> {
-            updateRelatedCaches(method, finalObject, args); //TODO: Decide whether this should run in threadPool.execute to avoid delays
+        updateRelatedCaches(method, finalObject, args); //TODO: Decide whether this should run in threadPool.execute to avoid delays
         //}); //we don't want the updates to delay returning
         return object;
     }
@@ -53,8 +55,8 @@ public class MnemoService {
             result = cacheProxy.getFromUnderlyingMethodAndUpdateMainCache(obj, args);
             final var threadResult = result;
             //threadPool.execute(() -> { //We want to update all related caches, without delaying returning
-                updateRelatedCaches(method, threadResult, args); // //TODO: Decide whether this should run in threadPool.execute to avoid delays
-           // });
+            updateRelatedCaches(method, threadResult, args); // //TODO: Decide whether this should run in threadPool.execute to avoid delays
+            // });
         }
         return result;
     }
@@ -74,7 +76,7 @@ public class MnemoService {
     }
 
     private void updateRelatedCache(UpdateCache updateCache, Method method, Object possibleUpdatedValue, Object... args) {
-        Object updatedValue = GeneralUtils.getAnnotatedUpdatedValue(method, args); // check if any of the args is annotated as @UpdatedValue.
+        Object updatedValue = getAnnotatedUpdatedValue(method, args); // check if any of the args is annotated as @UpdatedValue.
         if (updatedValue == null && possibleUpdatedValue == null) {//If neither an @UpdatedValue is present, nor an updatedCacheValue was given, there is nothing to do.
             return;
         }
@@ -83,20 +85,20 @@ public class MnemoService {
             updatedValue = possibleUpdatedValue; // Which means that if there is any @UpdatedValue in the arguments, the result of the method is not used for updates!. TODO: Write documentation
         }
 
-        var annotatedKeyNamesAndValues = GeneralUtils.getUpdateKeyNamesAndCorrespondingValues(method, args);
+        var annotatedKeyNamesAndValues = getUpdateKeyNamesAndCorrespondingValues(method, args);
         var targetObjectKeyNamesAndValues = updateCache.targetObjectKeys();
-        var id = GeneralUtils.deduceId(updatedValue);
+        var idOfUpdatedValue = GeneralUtils.deduceId(updatedValue);
         final Object finalUpdatedValue = updatedValue;
         var cacheToBeUpdated = this.cachesByName.get(updateCache.name());
 
         assert (cacheToBeUpdated != null);
 
-        var key = GeneralUtils.getCompoundKeyForUpdateNew(annotatedKeyNamesAndValues, targetObjectKeyNamesAndValues, finalUpdatedValue);
+        var key = getCompoundKeyForUpdateNew(annotatedKeyNamesAndValues, List.of(targetObjectKeyNamesAndValues), finalUpdatedValue);
 
-        if (Map.class.isAssignableFrom(id.getClass())) {
-            cacheToBeUpdated.updateCacheKeysAndIds(key, (Map) id, updateCache);
+        if (idOfUpdatedValue instanceof Map) {
+            cacheToBeUpdated.updateCacheKeysAndIds(key, (Map) idOfUpdatedValue, updateCache);
         } else {
-            cacheToBeUpdated.updateCacheKeysAndIds(key, Map.of(id, updatedValue), updateCache);
+            cacheToBeUpdated.updateCacheKeysAndIds(key, Map.of(idOfUpdatedValue, updatedValue), updateCache);
         }
 
     }
@@ -160,28 +162,28 @@ public class MnemoService {
         if (annotation == null || method == null) {
             return null;
         }
+        Class<?> returnedClassType = method.getReturnType();
+
+        var handleCollectionKeysSeparately = annotation.allowSeparateHandlingForKeyCollections();
+        var returnsCollection = Collection.class.isAssignableFrom(returnedClassType);
+
+        var cacheParams = annotationValuesToCacheParameters(annotation, returnsCollection, handleCollectionKeysSeparately);
+        generalControls(method, cacheParams);
+
+        Class<? extends AbstractMnemosyneCache> algoClass = cacheParams.getCacheType();
+        ValuePool valuePool = createValuePool(method);
+        AbstractMnemosyneCache cache = null;
         try {
-            Class<?> returnedClass = method.getReturnType();
-
-            var handleCollectionKeysSeparately = annotation.allowSeparateHandlingForKeyCollections();
-            var returnsCollection = Collection.class.isAssignableFrom(returnedClass);
-
-            var cacheParams = annotationValuesToCacheParameters(annotation, returnsCollection, handleCollectionKeysSeparately);
-            generalControls(method, cacheParams);
-
-            Class<? extends AbstractMnemosyneCache> algoClass = cacheParams.getCacheType();
-            ValuePool valuePool = createValuePool(method);
-            var cache = algoClass.getDeclaredConstructor(CacheParameters.class, ValuePool.class).newInstance(cacheParams, valuePool);
-            var proxyService = new MnemoProxy<>(cache, method, valuePool, returnsCollection, handleCollectionKeysSeparately);
-
-            proxies.put(method, proxyService);
-            cachesByName.put(annotation.cacheName(), proxyService);
-
-            return proxyService;
-
+            cache = algoClass.getDeclaredConstructor(CacheParameters.class, ValuePool.class).newInstance(cacheParams, valuePool);
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new MnemosyneRuntimeException(e);
         }
+        var proxyService = new MnemoProxy<>(cache, method, valuePool, returnsCollection, handleCollectionKeysSeparately);
+
+        proxies.put(method, proxyService);
+        cachesByName.put(annotation.cacheName(), proxyService);
+
+        return proxyService;
     }
 
     private void generalControls(Method method, CacheParameters parameters) {
@@ -189,11 +191,11 @@ public class MnemoService {
         var arguments = method.getParameters();
 
         if (returnType.equals(Void.TYPE) && method.getAnnotation(Cached.class) != null) {
-            throw new RuntimeException("Void methods cannot be cached."); //TODO: Testfall
+            throw new MnemosyneInitializationException("Void methods cannot be cached."); //TODO: Testfall
         }
 
         if (cachesByName.get(parameters.getCacheName()) != null) {
-            throw new RuntimeException("Cache with the same name already exists!");
+            throw new MnemosyneInitializationException("Cache with the same name already exists!");
         }
 
         if (parameters.isHandleCollectionKeysSeparately()) {
@@ -205,42 +207,107 @@ public class MnemoService {
                 possibleKeys = Arrays.stream(arguments).toList();
             }
             if (possibleKeys.size() != 1) {
-                throw new RuntimeException("Separate key handling impossible for this number of arguments.");
+                throw new MnemosyneInitializationException("Separate key handling impossible for this number of arguments.");
             }
 
             if (Collection.class.isAssignableFrom(returnType)) {
-                var returnTypeIsList = returnType.getName().equals("java.util.List");
-                var returnTypeIsSet = returnType.getName().equals("java.util.Set");
-                var returnTypeIsCollection = returnType.getName().equals("java.util.Collection");
-
-                if (!returnTypeIsList && !returnTypeIsSet && !returnTypeIsCollection) {
-                    throw new RuntimeException("Separate key handling impossible for this return type.");
+                if (isUnacceptableSeparateHandlingTypes(returnType.getName())) {
+                    throw new MnemosyneInitializationException("Separate key handling impossible for this return type.");
                 }
-                var keyTypeIsList = possibleKeys.get(0).getType().getName().equals("java.util.List");
-                var keyTypeIsSet = possibleKeys.get(0).getType().getName().equals("java.util.Set");
-                var keyTypeIsCollection = possibleKeys.get(0).getType().getName().equals("java.util.Collection");
-
-                if (!keyTypeIsList && !keyTypeIsSet && !keyTypeIsCollection) {
-                    throw new RuntimeException("Separate key handling impossible for this key type.");
+                if (isUnacceptableSeparateHandlingTypes(possibleKeys.get(0).getType().getName())) {
+                    throw new MnemosyneInitializationException("Separate key handling impossible for this key type.");
                 }
             } else {
-                throw new RuntimeException("Separate key handling impossible for this return type.");
+                throw new MnemosyneInitializationException("Separate key handling impossible for this return type.");
             }
-
         }
     }
 
     private void updateControls(Method method, UpdateCache updateCache) {
         if (method != null && updateCache != null) {
-            if (updateCache.addIfAbsent() &&
-                    (updateCache.removeValueFromAllCollections() || updateCache.remove() || updateCache.removeValueFromCollection() || updateCache.invalidatesCache())) {
-                throw new RuntimeException("Wrong flags: you cannot both add and remove a value.");
-            }
-            if (GeneralUtils.moreThanOneAnnotationsPresentInParameterList(method, UpdatedValue.class)) {
-                throw new RuntimeException("At most one UpdatedValue allowed");
+           /* if (updateCache.addIfAbsent() &&
+                    (updateCache.removesValueFromAllCollections() || updateCache.remove() || updateCache.removesValueFromSingleCollection() || updateCache.invalidatesCache())) {
+                throw new MnemosyneUpdateException("Wrong flags: you cannot both add and remove a value.");
+            }*/
+            if (moreThanOneAnnotationsPresentInParameterList(method, UpdatedValue.class)) {
+                throw new MnemosyneUpdateException("At most one UpdatedValue allowed");
             }
             //TODO: Exception when two @UpdateCache check the same cache
         }
+    }
+
+
+
+    private boolean moreThanOneAnnotationsPresentInParameterList(Method method, Class<?> annotationType) {
+        var paramannot = method.getParameterAnnotations();
+
+        int i = 0;
+        for (Annotation[] annotations : paramannot) {
+            for (Annotation annotation : annotations) {
+                if (annotation.annotationType().equals(annotationType)) {
+                    ++i;
+                }
+            }
+        }
+        return i > 1;
+    }
+
+
+    private Object getAnnotatedUpdatedValue(Method method, Object[] args) {
+        var paramannot = method.getParameterAnnotations();
+
+        int i = 0;
+        for (Annotation[] annotations : paramannot) {
+            for (Annotation annotation : annotations) {
+                if (annotation.annotationType() == UpdatedValue.class) {
+                    return args[i];
+                }
+            }
+            i += 1;
+        }
+
+        return null;
+    }
+
+    private CompoundKey getCompoundKeyForUpdateNew(Map<String, Object> annotatedKeyNamesAndValues, List<String> targetObjectKeys, Object targetObject) {
+        List<Object> keyObjects = new ArrayList<>(); //
+
+        annotatedKeyNamesAndValues.keySet().forEach(keyName -> {
+            keyObjects.add(annotatedKeyNamesAndValues.get(keyName));
+        });
+
+        for (String keyName : targetObjectKeys) {
+            keyObjects.add(GeneralUtils.tryGetObject(targetObject, keyName));
+        }
+
+        return new CompoundKey(keyObjects.toArray());
+    }
+
+
+    private Map<String, Object> getUpdateKeyNamesAndCorrespondingValues(Method method, Object[] args) {
+        var parameterAnnotations = method.getParameterAnnotations();
+        var keyNameAndValue = new HashMap<String, Object>();
+        int i = 0;
+
+        for (Annotation[] annotations : parameterAnnotations) {
+            for (Annotation annotation : annotations) {
+                if (annotation.annotationType() == UpdateKey.class) {
+                    keyNameAndValue.put(((UpdateKey) annotation).name(), args[i]);
+                }
+            }
+            i += 1;
+        }
+
+        return keyNameAndValue;
+    }
+
+
+    private boolean isUnacceptableSeparateHandlingTypes(String typename) {
+        var isList = typename.equals("java.util.List");
+        var isSet = typename.equals("java.util.Set");
+        var isCollection = typename.equals("java.util.Collection");
+
+        return (!isSet && !isList && !isCollection);
     }
 
 }

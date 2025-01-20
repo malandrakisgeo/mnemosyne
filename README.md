@@ -145,6 +145,7 @@ But this is nothing one person can achieve alone, so feel free to contribute!
 * Test, test, test, test.
 * Write more elaborate and cleaner documentation
 * Add support for LRU and S3-FIFO
+* Make the cache return clones of the caches values
 * Add better support for conditional update
 * Add easy configuration for non-Spring applications
 * Make all adjusts needed to make it work properly on distributed systems (final boss!)

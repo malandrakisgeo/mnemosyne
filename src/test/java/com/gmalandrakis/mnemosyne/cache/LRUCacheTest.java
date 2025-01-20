@@ -1,15 +1,5 @@
 package com.gmalandrakis.mnemosyne.cache;
 
-import static org.junit.Assert.*;
-
-import com.gmalandrakis.mnemosyne.cache.old.LRUCache;
-import com.gmalandrakis.mnemosyne.structures.CacheParameters;
-import org.junit.Test;
-
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-
 public class LRUCacheTest {
     /*
         Most of these test-cases are ChatGPT-generated, with minor modifications.

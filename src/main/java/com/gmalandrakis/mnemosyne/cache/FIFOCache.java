@@ -1,9 +1,10 @@
 package com.gmalandrakis.mnemosyne.cache;
 
+import com.gmalandrakis.mnemosyne.core.ValuePool;
+import com.gmalandrakis.mnemosyne.exception.MnemosyneRetrievalException;
 import com.gmalandrakis.mnemosyne.structures.CacheParameters;
 import com.gmalandrakis.mnemosyne.structures.CollectionIdWrapper;
 import com.gmalandrakis.mnemosyne.structures.SingleIdWrapper;
-import com.gmalandrakis.mnemosyne.core.ValuePool;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -13,7 +14,8 @@ import java.util.stream.Collectors;
 public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
 
     ConcurrentLinkedQueue<K> concurrentFIFOQueue = new ConcurrentLinkedQueue<>();
-    Set<ID> idsInUse = returnsCollection ? Collections.synchronizedSet(new HashSet<>()) : null; //TODO: Map to integer (multiple uses) or delete.
+
+    Set<ID> idsInUse = returnsCollection ? Collections.synchronizedSet(new HashSet<>()) : null; //Meaningless to use for values with a 1-1 correspondence between keys and IDs.
 
     public FIFOCache(CacheParameters parameters, ValuePool poolService) {
         super(parameters, poolService);
@@ -30,12 +32,12 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
             this.evict();
         }
 
-        var possibleValue = keyIdMap.get(key);
+        var possibleValue = keyIdMapper.get(key);
         if (possibleValue != null) {
             var valueAsCollectionIdWrapper = (CollectionIdWrapper) possibleValue;
             valueAsCollectionIdWrapper.addAllToCollectionOrUpdate(map.keySet());
         } else {
-            keyIdMap.put(key, new CollectionIdWrapper<>(map.keySet()));
+            keyIdMapper.put(key, new CollectionIdWrapper<>(map.keySet()));
         }
         if (!concurrentFIFOQueue.contains(key)) {
             concurrentFIFOQueue.add(key);
@@ -51,7 +53,6 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
 
     }
 
-
     @Override
     public void put(K key, ID id, T value) {
         if (key == null || id == null) {
@@ -62,7 +63,7 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
         }
         var idAlreadyInThisCache = false;
         var keyAlreadyInThisCache = concurrentFIFOQueue.contains(key);
-        var existentIdWrapperForKe = keyIdMap.get(key);
+        var existentIdWrapperForKey = keyIdMapper.get(key);
 
         if (returnsCollection) {
             idAlreadyInThisCache = idsInUse.contains(id);
@@ -70,22 +71,21 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
                 idsInUse.add(id);
             }
 
-            if (existentIdWrapperForKe != null) {
-                ((CollectionIdWrapper) existentIdWrapperForKe).addToCollectionOrUpdate(id);
+            if (existentIdWrapperForKey != null) {
+                ((CollectionIdWrapper) existentIdWrapperForKey).addToCollectionOrUpdate(id);
             } else {
-                keyIdMap.put(key, new CollectionIdWrapper<>(Collections.singleton(id)));
+                keyIdMapper.put(key, new CollectionIdWrapper<>(Collections.singleton(id)));
             }
 
         } else {
             idAlreadyInThisCache = keyAlreadyInThisCache; //We have a one-key-to-one-id correlation. Checking for the key in the FIFO struct suffices.
 
-            if (existentIdWrapperForKe != null) {
-                if (((SingleIdWrapper) existentIdWrapperForKe).getId() != id) {
-                    throw new RuntimeException("ID uniqueness violation or mistake during ID fetching");
+            if (existentIdWrapperForKey != null) {
+                if (((SingleIdWrapper) existentIdWrapperForKey).getId() != id) {
+                    throw new MnemosyneRetrievalException("ID uniqueness violation or mistake during ID fetching");
                 }
-                existentIdWrapperForKe.updateLastAccessed();
             } else {
-                keyIdMap.put(key, new SingleIdWrapper<>(id));
+                keyIdMapper.put(key, new SingleIdWrapper<>(id));
             }
         }
         if (!keyAlreadyInThisCache) {
@@ -100,9 +100,9 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
         if (!concurrentFIFOQueue.contains(key)) {
             return null;
         }
-        var cachedIdData = keyIdMap.get(key);
+        var cachedIdData = keyIdMapper.get(key);
         if (cachedIdData == null) {
-            throw new RuntimeException("Key is present in concurrent FIFO queue, buy not in keyIdMap: " + key.toString());
+            throw new MnemosyneRetrievalException("Key is present in concurrent FIFO queue, buy not in keyIdMap: " + key.toString());
         }
         //TODO: If handleCollectionKeysSeparately, a cacheIdData with single Id should be used.
         ID id = (ID) (handleCollectionKeysSeparately ? ((CollectionIdWrapper) cachedIdData).getIds().toArray()[0] : ((SingleIdWrapper) cachedIdData).getId());
@@ -115,9 +115,9 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
         if (!returnsCollection || !concurrentFIFOQueue.contains(key)) {
             return Collections.emptyList();
         }
-        var id = (CollectionIdWrapper) keyIdMap.get(key);
+        var id = (CollectionIdWrapper) keyIdMapper.get(key);
         if (id == null) {
-            return Collections.emptyList();
+            throw new MnemosyneRetrievalException("Key is present in concurrent FIFO queue, buy not in keyIdMap: " + key.toString());
         }
         return valuePool.getAll(id.getIds());
     }
@@ -131,52 +131,55 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
         return all;
     }
 
-
     @Override
     public void remove(K key) {
 
-        var cacheData = keyIdMap.get(key);
+        var cacheData = keyIdMapper.get(key);
         if (cacheData == null) {
             return;
         }
         concurrentFIFOQueue.remove(key);
 
-        keyIdMap.remove(key);
+        keyIdMapper.remove(key);
 
         internalThreadService.execute(() -> {
 
             if (returnsCollection) {
                 var ids = ((CollectionIdWrapper) cacheData).getIds();
-                valuePool.removeOrDecreaseNumberOfUsesForIds(ids);
-                idsInUse.removeAll(ids);
+                Map<ID, Integer> map = valuePool.removeOrDecreaseNumberOfUsesForIds(ids);
+                map.forEach((id, numOfUses) -> {
+                    if (numOfUses == 0) {
+                        idsInUse.remove(id);
+                    }
+                });
             } else {
                 var id = (ID) ((SingleIdWrapper) cacheData).getId();
                 valuePool.removeOrDecreaseNumberOfUsesForId(id);
-                idsInUse.remove(id);
+
             }
-
         });
-
     }
 
     @Override
     public void removeOneFromCollection(K key, ID id) {
         if (returnsCollection) {
             if (key == null) {
-                for (K k : keyIdMap.keySet()) {
-                    ((CollectionIdWrapper) keyIdMap.get(k)).getIds().remove(id);
+                for (K k : keyIdMapper.keySet()) {
+                    ((CollectionIdWrapper) keyIdMapper.get(k)).getIds().remove(id);
                 }
 
             } else {
-                var cacheData = (CollectionIdWrapper) keyIdMap.get(key);
+                var cacheData = (CollectionIdWrapper) keyIdMapper.get(key);
                 if (cacheData == null) {
                     return;
                 }
                 cacheData.getIds().remove(id);
             }
 
-            valuePool.removeOrDecreaseNumberOfUsesForId(id);
-            idsInUse.remove(id);
+            var numOfUses = valuePool.removeOrDecreaseNumberOfUsesForId(id);
+            if (numOfUses == 0) {
+                idsInUse.remove(id);
+            }
         }
     }
 
@@ -200,7 +203,7 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
         }
         if (timeToLive != Long.MAX_VALUE && timeToLive > 0) {
 
-            var expiredValues = keyIdMap.entrySet().stream().filter(this::isExpired).map(Map.Entry::getKey).collect(Collectors.toSet());
+            var expiredValues = keyIdMapper.entrySet().stream().filter(this::isExpired).map(Map.Entry::getKey).collect(Collectors.toSet());
             expiredValues.forEach(this::remove);
         }
     }
@@ -215,7 +218,7 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
 
     @Override
     boolean idUsedAlready(ID v) { //TODO: Delete this disgrace when coming up with something better
-        return this.idsInUse.contains(v);
+        return idsInUse.contains(v);
     }
 
 }

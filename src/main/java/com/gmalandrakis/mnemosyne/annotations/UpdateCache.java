@@ -37,11 +37,9 @@ public @interface UpdateCache {
 
     String[] targetObjectKeys() default "";
 
-    boolean isTargetObjectKeys() default false;
+    boolean removesValueFromSingleCollection() default false;//if the cache is on a collection, this removes a single object from the collection corresponding to a key
 
-    boolean removeValueFromCollection() default false;//if the cache is on a collection, this removes a single object from the collection corresponding to a key
-
-    boolean removeValueFromAllCollections() default false;//if the cache is on a collection, this removes a single object from the collection corresponding to a key
+    boolean removesValueFromAllCollections() default false;//if the cache is on a collection, this removes a single object from the collection corresponding to a key
 
     boolean remove() default false; //if the cache is on a collection, this removes all objects from the collection corresponding to a key
 
@@ -52,7 +50,7 @@ public @interface UpdateCache {
      * If false, mnemosyne skips updating for absent keys.
      */
 
-    boolean addIfAbsent() default true;
+   // boolean addIfAbsent() default true;
 
     /**
      * Refers to one or more boolean values that have to be true before adding something new to the cache.

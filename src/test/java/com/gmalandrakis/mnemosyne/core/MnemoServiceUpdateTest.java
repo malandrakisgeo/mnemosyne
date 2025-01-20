@@ -120,7 +120,7 @@ public class MnemoServiceUpdateTest {
         }
 
 
-        @UpdateCache(name = "test9", keys = "testKey", addIfAbsent = true)
+        @UpdateCache(name = "test9", keys = "testKey")
         @Cached(cacheName = "testUpdate")
         public String update9Test2(@UpdateKey(name = "testKey") Integer i) {
             if (i == 1) {
@@ -139,7 +139,7 @@ public class MnemoServiceUpdateTest {
             return Collections.singletonList("Yoy");
         }
 
-        @UpdateCache(name = "test10", keys = "testKey", addIfAbsent = true)
+        @UpdateCache(name = "test10", keys = "testKey")
         public List<String> test10Updater(@UpdatedValue List<String> str, @UpdateKey(name = "testKey") Integer i) {
             return null;
         }

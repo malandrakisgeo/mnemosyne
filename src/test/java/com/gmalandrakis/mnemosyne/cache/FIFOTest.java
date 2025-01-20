@@ -1,7 +1,7 @@
 package com.gmalandrakis.mnemosyne.cache;
 
-import com.gmalandrakis.mnemosyne.structures.CacheParameters;
 import com.gmalandrakis.mnemosyne.core.ValuePool;
+import com.gmalandrakis.mnemosyne.structures.CacheParameters;
 import com.gmalandrakis.mnemosyne.utils.GeneralUtils;
 import org.junit.Before;
 import org.junit.Test;
@@ -9,7 +9,7 @@ import org.junit.Test;
 import java.util.*;
 
 
-public class FIFOTestNewWrapper {
+public class FIFOTest {
     /*
         1. Mia klash exei methodous pou epistrefoun mia lista me ena object, kai ena object antistoixa.
         2. H mia methodos (list) ginetai invalidated se 2 deuterolepta, h allh den ginetai.
@@ -65,7 +65,7 @@ public class FIFOTestNewWrapper {
     }
 
     @Test
-    public void test() {
+    public void verify__removalFromValuePool() throws InterruptedException {
         for (int i = 0; i < 10; i++) {
             var integersToI = this.getIntegersTo(i);
             var integerToI = this.getInteger(i);
@@ -79,10 +79,17 @@ public class FIFOTestNewWrapper {
         assert (collectionIntegerCache.concurrentFIFOQueue.isEmpty());
         assert (singleIntegerCache.concurrentFIFOQueue.contains(1));
 
-        assert (singleIntegerCache.keyIdMap.get(1) != null);
-        assert (valuePool.getValue(1) != null);
+        assert (singleIntegerCache.keyIdMapper.get(1) != null);
         assert (valuePool.getValue(1) != null);
 
+        singleIntegerCache.remove(1);
+        Thread.sleep(100);
+        assert (valuePool.getValue(1) == null);
+    }
+
+    @Test
+    public void verifyNullUsesRemovedFromValuePool(){
+        //TODO
     }
 
 
@@ -115,12 +122,11 @@ public class FIFOTestNewWrapper {
         assert (!collectionTestobjectCache.concurrentFIFOQueue.isEmpty());
 
         collectionTestobjectCache.remove(9); //testobject 9 referred to only once by collectiontestobjectcache
-        Thread.sleep(1000);
+        Thread.sleep(500);
         // assert (testObjectValuePool.getReferences(String.valueOf(9)) == 1);
 
 
         var result = getTestObjectsWithList(intlst);
-        result.get(0);
 
     }
 
@@ -142,7 +148,6 @@ public class FIFOTestNewWrapper {
         var objects = this.getTestObjects(200);
         var ids = (Map) GeneralUtils.deduceId(objects);
         collectionTestobjectCache.putAll(200, ids);
-        System.out.println(collectionTestobjectCache.concurrentFIFOQueue.size());
         assert (collectionTestobjectCache.concurrentFIFOQueue.size() == 100);
         assert (collectionTestobjectCache.getAll(0).isEmpty());
 //TODO the same for concurrent reads and writes

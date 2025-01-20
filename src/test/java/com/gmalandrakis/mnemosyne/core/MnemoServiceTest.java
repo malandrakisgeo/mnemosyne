@@ -2,6 +2,8 @@ package com.gmalandrakis.mnemosyne.core;
 
 import com.gmalandrakis.mnemosyne.annotations.*;
 import com.gmalandrakis.mnemosyne.cache.AbstractGenericCache;
+import com.gmalandrakis.mnemosyne.exception.MnemosyneInitializationException;
+import com.gmalandrakis.mnemosyne.exception.MnemosyneRuntimeException;
 import com.gmalandrakis.mnemosyne.structures.CollectionIdWrapper;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -15,62 +17,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 public class MnemoServiceTest {
-
-   /*  @Test
-    public void verify_notCalledAgainIfCached() throws Throwable {
-       var example = Mockito.spy(new TestObject());
-        MnemoServiceUltra mnemoService = new MnemoServiceUltra();
-        mnemoService.generateForClass(TestObject.class);
-        var aaaa = mnemoService.getProxies().get(TestObject.class.getMethod("getStr", Integer.class));
-
-        var p = aaaa.fetchFromCacheOrInvokeMethod(example, 1);
-        assert (p != null);
-        assert (p.equals("Yey!"));
-
-        p = aaaa.fetchFromCacheOrInvokeMethod(example, 1);
-        assert (p != null);
-        assert (p.equals("Yey!"));
-        verify(example, times(1)).getStr(any());
-        p = aaaa.fetchFromCacheOrInvokeMethod(example, 2);
-        assert (p != null);
-        assert (p.equals("Yoy"));
-        p = aaaa.fetchFromCacheOrInvokeMethod(example, 2);
-        verify(example, times(2)).getStr(any());
-    }
-
-    @Test
-    public void verify_twoCachesWithSamePool_and_handlesCollectionWhenCollection() throws Throwable {
-        var example = Mockito.spy(new TestObject());
-        MnemoServiceUltra mnemoService = new MnemoServiceUltra();
-        var getstr = mnemoService.generateForMethod(TestObject.class.getMethod("getStr", Integer.class));
-        var getstrs = mnemoService.generateForMethod(TestObject.class.getMethod("getStrs", Integer.class));
-        assert (getstrs.getCache().handlesCollections());
-        assert (!getstr.getCache().handlesCollections());
-        assert (getstrs.getValuePool().equals(getstr.getValuePool()));
-
-    }
-
-
-    public class TestObject {
-
-        @Cached(cacheName = "name", countdownFromCreation = true)
-        public String getStr(Integer i) {
-
-            if (i == 1) {
-                return "Yey!";
-            }
-            return "Yoy";
-        }
-
-        @Cached(cacheName = "myname", countdownFromCreation = true)
-        public List<String> getStrs(Integer i) {
-
-            if (i == 1) {
-                return Collections.singletonList("Yey!");
-            }
-            return Collections.singletonList("Yoy");
-        }
-    }*/
 
     @Test
     public void testValuePools() throws Throwable {
@@ -161,7 +107,7 @@ public class MnemoServiceTest {
 
         cache.invalidateCache();
         Thread.sleep(500);
-        assert(valuePool.getSize() == 0);
+        assert (valuePool.getSize() == 0);
 
         spyMnemo.fetchFromCacheOrInvokeMethodAndUpdate(test10, spyInnerClass, 1);
         verify(proxy10, times(2)).getFromUnderlyingMethodAndUpdateMainCache(any(), any());
@@ -177,11 +123,11 @@ public class MnemoServiceTest {
         var acceptableTypes = innerClass.class.getDeclaredMethod("test12", List.class, int.class);
         var impossibleKeyForSeparate = innerClass.class.getDeclaredMethod("test13", List.class, int.class);
 
-        assertThrows("Separate key handling impossible for this return type.", RuntimeException.class, () -> {
+        assertThrows(MnemosyneInitializationException.class, () -> {
             mnemoService.generateForMethod(impossibleReturnTypeForSeparate);
         });
         mnemoService.generateForMethod(acceptableTypes); //should not throw
-        assertThrows("Separate key handling impossible for this number of arguments.", RuntimeException.class, () -> {
+        assertThrows(MnemosyneRuntimeException.class, () -> {
             mnemoService.generateForMethod(impossibleKeyForSeparate);
         });
 
@@ -268,7 +214,7 @@ public class MnemoServiceTest {
             return null;
         }
 
-        @UpdateCache(name = "test9", keys = "testKey", addIfAbsent = true)
+        @UpdateCache(name = "test9", keys = "testKey")
         @Cached(cacheName = "testUpdate")
         public String updateTest9(@UpdateKey(name = "testKey") Integer i) {
             if (i == 1) {
@@ -287,7 +233,7 @@ public class MnemoServiceTest {
             return Collections.singletonList("Yoy");
         }
 
-        @UpdateCache(name = "test10", keys = "testKey", addIfAbsent = true)
+        @UpdateCache(name = "test10", keys = "testKey")
         public List<String> test10Updater(@UpdatedValue List<String> str, @UpdateKey(name = "testKey") Integer i) {
             return null;
         }

@@ -11,7 +11,6 @@ public class CollectionIdWrapper<ID> extends IdWrapper<ID> {
         this.collection = Collections.synchronizedSet(new HashSet<ID>(objs));
         this.createdOn = System.currentTimeMillis();
         this.lastAccessed = createdOn;
-
     }
 
     public void addAllToCollectionOrUpdate(Collection<ID> id) {
@@ -24,12 +23,12 @@ public class CollectionIdWrapper<ID> extends IdWrapper<ID> {
     }
 
     public void addToCollectionOrUpdate(ID id) {
-        this.collection.add(id); //hits and timestamps are updated only when requesting the IDs.
+        collection.add(id); //hits and timestamps are updated only when requesting the IDs.
     }
 
     public Collection<ID> getIds() {
         hits += 1;
         updateLastAccessed();
-        return this.collection;
+        return collection;
     }
 }

@@ -5,6 +5,7 @@ import com.gmalandrakis.mnemosyne.structures.CacheParameters;
 
 public class ParameterUtils {
 
+    //TODO: This is unnecessary. It may have served a purpose once, but after several refactors, it doesn't. Remove and just use the annotation and the boolean where the fields are needed.
     public static CacheParameters annotationValuesToCacheParameters(Cached annotation,  boolean returnsCollection, boolean handleCollectionKeysSeparately) {
         var cacheParameters = new CacheParameters();
         cacheParameters.setCacheName(annotation.cacheName());
