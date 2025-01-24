@@ -54,22 +54,31 @@ we will only update one place instead of three.
 The caches of the methods are only linked to IDs instead of transaction objects, so we won't need to update something there as long as
 an object is not deleted.
 
-But then we had other problems that arise.
+But then we have other problems that arise.
 
-What will the architecture of such a cache look like?
-Where will the job begin and how?
-How will we get all this work with just some annotations?
-What is an ID and how would we handle types that lack particular IDs?
-How will we get this to work with at least a Java framework like Spring, let alone with Java projects in general?
-How should we synchronize reads and/or writes on a distributed and multithreaded environment?
-How do we avoid memory leaks? If we evict all the caches containing a particular ID, how will we know it is time to get rid of the object in the ValuePool?
-How do we make sure we have no "zombie" values, e.g. if we delete a user along with their transactions?
-How can we make sure we will be able to use this in a distributed environment?
+What will the architecture of such a cache look like?<br>
+Where will the job begin and how?<br>
+How will we get all this work with just some annotations?<br>
+How do we handle caches on methods that use collections of keys and return collections of values? Shall we assume a one-to-one correlation between the keys and the values,
+and what should the cache do if it cannot be assumed?<br>
+If collections of keys are used, and the ordering of the keys in the collection plays some role for the underlying method (e.g. collection of XY coordinates),
+how can we ensure the cache does not mess up the results?<br>
+If two key-collections differ by only one key, how can we ensure we won't waste memory by saving the same stuff twice?<br>
+What is an ID and how would we handle types that lack particular IDs?<br>
+What happens if the same ID exists in e.g. five distinct collections on three different caches, and want to remove it from just one without affecting the results of the others? <br>
+What if we only want to update a cache on a condition, and not every time a method is called?<br>
+How will we get this to work with at least a Java framework like Spring, let alone with Java projects in general?<br>
+How will we test it, including the edge cases, and verify it works as expected?<br>
+How should we synchronize reads and/or writes on a multithreaded and/or distributed environment?<br>
+How do we make sure we have no "zombie" values, e.g. if we delete a user along with their transactions?<br>
+
+And more.
 
 Solving these problems is both logically and technically challenging.
 
-Many of them are (or seem to be) solved, but there is room for improvements.
-And of course there are other challenges to be handled.
+Some of them are solved. Others are current TODOs.
+Most led or lead to other challenges.
+And of course there is room for improvements in the existing code.
 
 You are welcome to join our journey towards an even smarter cache!
 
@@ -144,14 +153,15 @@ But this is nothing one person can achieve alone, so feel free to contribute!
 ### Current major TODOs
 * Test, test, test, test.
 * Write more elaborate and cleaner documentation
+* Improve the exception handling
 * Add support for LRU and S3-FIFO
-* Make the cache return clones of the caches values
 * Add better support for conditional update
 * Add easy configuration for non-Spring applications
 * Make all adjusts needed to make it work properly on distributed systems (final boss!)
 
 ### Mini TODOs
 Well, dozens! From changing variable names to deciding when to update asynchronously.
+You may find some in the issues too.
 
 ### TODOs under discusssion
 * Add support for custom ID deduction (which solves the proxying problem)

@@ -2,11 +2,14 @@ package com.gmalandrakis.mnemosyne.cache;
 
 import com.gmalandrakis.mnemosyne.core.ValuePool;
 import com.gmalandrakis.mnemosyne.structures.CacheParameters;
+import com.gmalandrakis.mnemosyne.structures.CacheValue;
 import com.gmalandrakis.mnemosyne.utils.GeneralUtils;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
 
 
 public class FIFOTest {
@@ -27,6 +30,7 @@ public class FIFOTest {
     FIFOCache<Integer, String, testObject> collectionTestobjectCache;
 
     FIFOCache<Integer, String, Integer> separateHandlingCache;
+    FIFOCache<Integer, String, Integer> separateHandlingCache2;
 
     ValuePool<Integer, Integer> valuePool = new ValuePool<>();
 
@@ -48,6 +52,7 @@ public class FIFOTest {
         cacheParameters.setThreadPoolSize(2);
         singleIntegerCache = new FIFOCache<>(cacheParameters, valuePool);
         singleTestobjectCache = new FIFOCache<>(cacheParameters, testObjectValuePool);
+        cacheParameters.setReturnsCollection(true);
         collectionIntegerCache = new FIFOCache<>(cacheParameters, valuePool);
 
         cacheParameters.setTimeToLive(20000000);
@@ -60,7 +65,9 @@ public class FIFOTest {
         collectionTestobjectCache = new FIFOCache<>(cacheParameters, testObjectValuePool);
         cacheParameters.setHandleCollectionKeysSeparately(true);
 
+        cacheParameters.setThreadPoolSize(50);
         separateHandlingCache = new FIFOCache<>(cacheParameters, testObjectValuePool);
+        separateHandlingCache2 = new FIFOCache<>(cacheParameters, testObjectValuePool);
 
     }
 
@@ -68,27 +75,28 @@ public class FIFOTest {
     public void verify__removalFromValuePool() throws InterruptedException {
         for (int i = 0; i < 10; i++) {
             var integersToI = this.getIntegersTo(i);
-            var integerToI = this.getInteger(i);
+            var integer = this.getInteger(i);
             var idmap = GeneralUtils.deduceId(integersToI);
 
             collectionIntegerCache.putAll(i, (Map) idmap);
 
-            singleIntegerCache.put(i, i, integerToI);
+            singleIntegerCache.put(i, i, integer);
             collectionIntegerCache.remove(i);
         }
-        assert (collectionIntegerCache.concurrentFIFOQueue.isEmpty());
+       assert (collectionIntegerCache.concurrentFIFOQueue.isEmpty());
         assert (singleIntegerCache.concurrentFIFOQueue.contains(1));
 
         assert (singleIntegerCache.keyIdMapper.get(1) != null);
         assert (valuePool.getValue(1) != null);
 
         singleIntegerCache.remove(1);
-        Thread.sleep(100);
+        Thread.sleep(150);
         assert (valuePool.getValue(1) == null);
+        collectionIntegerCache.hashCode();
     }
 
     @Test
-    public void verifyNullUsesRemovedFromValuePool(){
+    public void verifyNullUsesRemovedFromValuePool() {
         //TODO
     }
 
@@ -122,11 +130,12 @@ public class FIFOTest {
         assert (!collectionTestobjectCache.concurrentFIFOQueue.isEmpty());
 
         collectionTestobjectCache.remove(9); //testobject 9 referred to only once by collectiontestobjectcache
+        singleTestobjectCache.remove(9); //testobject 9 referred to only once by collectiontestobjectcache
+
         Thread.sleep(500);
-        // assert (testObjectValuePool.getReferences(String.valueOf(9)) == 1);
+        assert (testObjectValuePool.getValue(String.valueOf(9)) == null);
+        singleTestobjectCache.get(0);
 
-
-        var result = getTestObjectsWithList(intlst);
 
     }
 
@@ -155,14 +164,22 @@ public class FIFOTest {
 
 
     @Test
-    public void testSpeed() {
-        System.out.println(System.currentTimeMillis());
+    public void test_separateCacheHandling() throws Exception {
 
+        System.out.println(System.currentTimeMillis());
+        var valMapField = valuePool.getClass().getDeclaredField("valueMap");
+        valMapField.setAccessible(true);
+        var valueMap = (ConcurrentHashMap<?, CacheValue<?>>) valMapField.get(collectionIntegerCache.valuePool);
         for (int i = 0; i < 1000; i++) {
             var integersToI = this.getIntegersTo(i);
             var id = (Map) GeneralUtils.deduceId(integersToI);
             collectionIntegerCache.putAll(i, id);
         }
+        assert (valueMap.get(0).getNumberOfUses() == 1); //only in one cache
+        assert (collectionIntegerCache.numberOfUsesById.get(0) == 1000); //but used in by a thousand keys!
+
+        collectionIntegerCache.invalidateCache();
+        assert (valueMap.get(0) == null);
 
         for (int i = 0; i < 10000; i++) {
             var integerToI = this.getInteger(i);
@@ -172,23 +189,53 @@ public class FIFOTest {
         }
         System.out.println(System.currentTimeMillis());
 
+
+        testObjectValuePool = new ValuePool<>();
+        //var valMapField = testObjectValuePool.getClass().getDeclaredField("valueMap");
+        //   valMapField.setAccessible(true);
+        valueMap = (ConcurrentHashMap<?, CacheValue<?>>) valMapField.get(testObjectValuePool);
+        cacheParameters.setThreadPoolSize(10);
+        separateHandlingCache = new FIFOCache<>(cacheParameters, testObjectValuePool);
+        separateHandlingCache2 = new FIFOCache<>(cacheParameters, testObjectValuePool);
+
+        /*
+            The test below:
+            1. Iteratively generates a 0<N<1000 lists of integers that contain values from 1 to N, where
+            2. Deduces the IDs of those lists after treating them as string values.
+            3. Puts all lists and ids in two separeteHandling-caches
+            4. verifies  the value pool has correct number of cachesUsingValue after putting, and after invalidating in one cache
+            5. Gives us some hints about the speed to do all these in separateHandling caches
+         */
         for (int i = 0; i < 1000; i++) {
             var integersToI = this.getIntegersTo(i);
-            var id = (Map) GeneralUtils.deduceId(integersToI);
+            var id = (Map) GeneralUtils.deduceId(integersToI.stream().map(String::valueOf).toList());
             separateHandlingCache.putAll(i, id);
+            separateHandlingCache2.putAll(i, id);
+
         }
+        var randonum1 = ThreadLocalRandom.current().nextInt(0, 1001);
+        var randonum2 = ThreadLocalRandom.current().nextInt(0, 1001);
+
+        assert (valueMap.get(String.valueOf(randonum1)).getNumberOfUses() == 2);
+        assert (valueMap.get(String.valueOf(randonum2)).getNumberOfUses() == 2);
+
+        separateHandlingCache.invalidateCache();
+
         System.out.println(System.currentTimeMillis());
 
-        var bol = separateHandlingCache.idUsedAlready("1");
-        System.out.println(bol);
-        System.out.println(System.currentTimeMillis());
+        assert (valueMap.get(String.valueOf(randonum1)).getNumberOfUses() == 1);
+        assert (valueMap.get(String.valueOf(randonum2)).getNumberOfUses() == 1);
+
+
+        assert (!separateHandlingCache.idUsedAlready("1"));
+        assert (separateHandlingCache2.idUsedAlready("1"));
 
 
     }
 
 
     private List<Integer> getIntegersTo(int i) {
-        if (i <= 0) {
+        if (i < 0) {
             return Collections.emptyList();
         }
         var lst = new ArrayList<Integer>();

@@ -214,9 +214,9 @@ public class MnemoServiceTest {
             return null;
         }
 
-        @UpdateCache(name = "test9", keys = "testKey")
+        @UpdatesCache(name = "test9", annotatedKeys = "testKey")
         @Cached(cacheName = "testUpdate")
-        public String updateTest9(@UpdateKey(name = "testKey") Integer i) {
+        public String updateTest9(@UpdateKey(keyId = "testKey") Integer i) {
             if (i == 1) {
                 return "Yey!";
             }
@@ -233,8 +233,8 @@ public class MnemoServiceTest {
             return Collections.singletonList("Yoy");
         }
 
-        @UpdateCache(name = "test10", keys = "testKey")
-        public List<String> test10Updater(@UpdatedValue List<String> str, @UpdateKey(name = "testKey") Integer i) {
+        @UpdatesCache(name = "test10", annotatedKeys = "testKey")
+        public List<String> test10Updater(@UpdatedValue List<String> str, @UpdateKey(keyId = "testKey") Integer i) {
             return null;
         }
 

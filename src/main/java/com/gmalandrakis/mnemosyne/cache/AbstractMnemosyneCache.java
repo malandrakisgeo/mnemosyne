@@ -5,6 +5,7 @@ import com.gmalandrakis.mnemosyne.structures.IdWrapper;
 import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 /**
  * A general description of the Caches used by mnemosyne.
@@ -18,7 +19,11 @@ import java.util.concurrent.ConcurrentHashMap;
  * @see AbstractGenericCache
  */
 public abstract class AbstractMnemosyneCache<K, ID, V> {
-    final ConcurrentHashMap<K, IdWrapper<ID>> keyIdMapper = new ConcurrentHashMap<>();
+    /**
+     * A map from the keys to the related ID values.
+     * This should be a ConcurrentMap in order for mnemosyne to properly work in a multithreaded application.
+     */
+    ConcurrentMap<K, IdWrapper<ID>> keyIdMapper;
 
     /**
      *
@@ -76,8 +81,7 @@ public abstract class AbstractMnemosyneCache<K, ID, V> {
 
     /**
      * Used to retrieve the next element that is of most interest to the algorithm.
-     * A use case example is getting the oldest element of a FIFO Cache.
-     * *
+     * A use case example is getting the key of the object that should be evicted next.
      *
      * @return The key of the element that the eviction algorithm may target next.
      */

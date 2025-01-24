@@ -7,24 +7,53 @@ import com.gmalandrakis.mnemosyne.structures.CollectionIdWrapper;
 import com.gmalandrakis.mnemosyne.structures.SingleIdWrapper;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.stream.Collectors;
 
+/**
+ * The default implementation of a FIFO cache.
+ * <p>
+ * The cache uses an underlying ValuePool that maps the IDs of the values with the values themselves.
+ * <p>
+ * A mnemosyne cache can either return whole collections of objects, or return one object at the time.
+ * Since multiple keys can be referring to the same IDs, the default FIFO cache uses a map that maps every
+ * ID with the number of uses (i.e. the number of keys referring to it), as well as a ConcurrentLinkedQueue
+ * that ensures the FIFO ordering on evictions.
+ *
+ * @param <K>
+ * @param <ID>
+ * @param <T>
+ */
 @SuppressWarnings({"unchecked", "rawtypes"})
 public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
 
-    ConcurrentLinkedQueue<K> concurrentFIFOQueue = new ConcurrentLinkedQueue<>();
+    final ConcurrentLinkedQueue<K> concurrentFIFOQueue = new ConcurrentLinkedQueue<>();
 
-    Set<ID> idsInUse = returnsCollection ? Collections.synchronizedSet(new HashSet<>()) : null; //Meaningless to use for values with a 1-1 correspondence between keys and IDs.
+    /*
+        In collection-caches, a key corresponds to multiple IDs. We need a way to know how many keys are using an ID without transversing through
+        the whole map of keys and their ID-collections every time.
+        In single-key-caches, more often than not, there is a 1-1 correspondence between keys and IDs. But this is not *guaranteed*
+        (fun exercise: come up with cases where the same Object/ID is the "answer" to multiple keys) , and especially when we
+        are dealing with cache updates: we may want to use a key with a brand new value and corresponding ID.
+        By keeping track of how many keys are using an ID, we can accurately inform the ValuePool that it may be time to get rid of an ID and its' corresponding
+        object.
+     */
+    final ConcurrentHashMap<ID, Integer> numberOfUsesById = new ConcurrentHashMap<ID, Integer>();
 
     public FIFOCache(CacheParameters parameters, ValuePool poolService) {
         super(parameters, poolService);
     }
 
-
     @Override
     public void putAll(K key, Map<ID, T> map) {
-        if (key == null || map == null || !returnsCollection) {
+        if (key == null || map == null) {
+            return;
+        }
+
+        if (!returnsCollection) {
+            map.forEach((id, val) -> {
+                put(key, id, val);
+            });
             return;
         }
 
@@ -32,25 +61,19 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
             this.evict();
         }
 
-        var possibleValue = keyIdMapper.get(key);
-        if (possibleValue != null) {
-            var valueAsCollectionIdWrapper = (CollectionIdWrapper) possibleValue;
-            valueAsCollectionIdWrapper.addAllToCollectionOrUpdate(map.keySet());
-        } else {
-            keyIdMapper.put(key, new CollectionIdWrapper<>(map.keySet()));
-        }
+        var possibleValue = (CollectionIdWrapper<ID>) keyIdMapper.computeIfAbsent(key, k -> new CollectionIdWrapper<>());
+        possibleValue.addAllToCollectionOrUpdate(map.keySet());
+
         if (!concurrentFIFOQueue.contains(key)) {
             concurrentFIFOQueue.add(key);
         }
 
-       /* for (int i = 0; i < idList.size(); i++) {
-            valuePool.put(idList.get(i), valueList.get(i), !idUsedAlready(idList.get(i)));
-        }*/
         map.forEach((id, val) -> {
-            valuePool.put(id, val, !idUsedAlready(id));
-            idsInUse.add(id);
+            var numberOfCollectionsUsingId = numberOfUsesById.getOrDefault(id, 0);
+            var idUsedAlready = numberOfCollectionsUsingId != 0;
+            numberOfUsesById.put(id, ++numberOfCollectionsUsingId);
+            valuePool.put(id, val, !idUsedAlready);
         });
-
     }
 
     @Override
@@ -61,38 +84,12 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
         if (concurrentFIFOQueue.size() >= this.actualCapacity) {
             this.evict();
         }
-        var idAlreadyInThisCache = false;
-        var keyAlreadyInThisCache = concurrentFIFOQueue.contains(key);
-        var existentIdWrapperForKey = keyIdMapper.get(key);
 
         if (returnsCollection) {
-            idAlreadyInThisCache = idsInUse.contains(id);
-            if (!idAlreadyInThisCache) {
-                idsInUse.add(id);
-            }
-
-            if (existentIdWrapperForKey != null) {
-                ((CollectionIdWrapper) existentIdWrapperForKey).addToCollectionOrUpdate(id);
-            } else {
-                keyIdMapper.put(key, new CollectionIdWrapper<>(Collections.singleton(id)));
-            }
-
+            putInCollection(key, id, value);
         } else {
-            idAlreadyInThisCache = keyAlreadyInThisCache; //We have a one-key-to-one-id correlation. Checking for the key in the FIFO struct suffices.
-
-            if (existentIdWrapperForKey != null) {
-                if (((SingleIdWrapper) existentIdWrapperForKey).getId() != id) {
-                    throw new MnemosyneRetrievalException("ID uniqueness violation or mistake during ID fetching");
-                }
-            } else {
-                keyIdMapper.put(key, new SingleIdWrapper<>(id));
-            }
+            putInSingle(key, id, value);
         }
-        if (!keyAlreadyInThisCache) {
-            concurrentFIFOQueue.add(key);
-        }
-        valuePool.put(id, value, !idAlreadyInThisCache);
-
     }
 
     @Override
@@ -139,33 +136,39 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
             return;
         }
         concurrentFIFOQueue.remove(key);
-
         keyIdMapper.remove(key);
 
-        internalThreadService.execute(() -> {
+        if (returnsCollection) {
+            Collection<ID> ids = ((CollectionIdWrapper) cacheData).getIds();
+            ids.forEach(this::removeOrDecrease);
+        } else {
+            var id = (ID) ((SingleIdWrapper) cacheData).getId();
+            // valuePool.removeOrDecreaseNumberOfUsesForId(id);
+            removeOrDecrease(id);
+        }
 
-            if (returnsCollection) {
-                var ids = ((CollectionIdWrapper) cacheData).getIds();
-                Map<ID, Integer> map = valuePool.removeOrDecreaseNumberOfUsesForIds(ids);
-                map.forEach((id, numOfUses) -> {
-                    if (numOfUses == 0) {
-                        idsInUse.remove(id);
-                    }
-                });
-            } else {
-                var id = (ID) ((SingleIdWrapper) cacheData).getId();
-                valuePool.removeOrDecreaseNumberOfUsesForId(id);
 
-            }
-        });
     }
 
     @Override
     public void removeOneFromCollection(K key, ID id) {
         if (returnsCollection) {
-            if (key == null) {
+            if (key == null) { //delete the ID from all collections!
+                var relatedKeys = new HashSet<>();
                 for (K k : keyIdMapper.keySet()) {
-                    ((CollectionIdWrapper) keyIdMapper.get(k)).getIds().remove(id);
+                    var deleted = ((CollectionIdWrapper) keyIdMapper.get(k)).getIds().remove(id);
+
+                    if (deleted) {
+                        relatedKeys.add(k);
+                    }
+                    numberOfUsesById.remove(id);
+                    valuePool.removeOrDecreaseNumberOfUsesForId(id);
+                }
+                if (handleCollectionKeysSeparately) { //TODO: Perhaps you should treat the handleCollectionKeysSeparately as non-collection-cache for removing.
+                    relatedKeys.forEach(k -> {
+                        keyIdMapper.remove(k);
+                        concurrentFIFOQueue.remove(k);
+                    });
                 }
 
             } else {
@@ -173,12 +176,13 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
                 if (cacheData == null) {
                     return;
                 }
-                cacheData.getIds().remove(id);
+                cacheData.getIds().remove(id); //o prwtos pou tha mou steilei email gia auto to sxolio lamvanei pente evrw.
+                removeOrDecrease(id);
             }
 
             var numOfUses = valuePool.removeOrDecreaseNumberOfUsesForId(id);
             if (numOfUses == 0) {
-                idsInUse.remove(id);
+                numberOfUsesById.remove(id);
             }
         }
     }
@@ -195,16 +199,16 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
 
     @Override
     public void evict() {
+        if (timeToLive != Long.MAX_VALUE && timeToLive > 0) {
+            var expiredValues = keyIdMapper.entrySet().stream().filter(this::isExpired).map(Map.Entry::getKey);
+            expiredValues.forEach(this::remove);
+        }
+
         while (concurrentFIFOQueue.size() >= this.actualCapacity) {
             var oldestElement = concurrentFIFOQueue.poll();
             if (oldestElement != null) {
                 remove(oldestElement);
             }
-        }
-        if (timeToLive != Long.MAX_VALUE && timeToLive > 0) {
-
-            var expiredValues = keyIdMapper.entrySet().stream().filter(this::isExpired).map(Map.Entry::getKey).collect(Collectors.toSet());
-            expiredValues.forEach(this::remove);
         }
     }
 
@@ -218,7 +222,57 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
 
     @Override
     boolean idUsedAlready(ID v) { //TODO: Delete this disgrace when coming up with something better
-        return idsInUse.contains(v);
+        var numberOfCollectionsUsingIt = numberOfUsesById.get(v);
+        return numberOfCollectionsUsingIt != null && numberOfCollectionsUsingIt > 0;
+    }
+
+    private void putInCollection(K key, ID id, T value) {
+        var keyAlreadyInThisCache = concurrentFIFOQueue.contains(key);
+        var idWrapper = (CollectionIdWrapper) keyIdMapper.computeIfAbsent(key, k -> new CollectionIdWrapper());
+
+        var numberOfCollectionsUsingId = numberOfUsesById.getOrDefault(id, 0);
+        var idUsedAlready = numberOfCollectionsUsingId != 0;
+        numberOfUsesById.put(id, ++numberOfCollectionsUsingId);
+
+        idWrapper.addToCollectionOrUpdate(id);
+
+        if (!keyAlreadyInThisCache) {
+            concurrentFIFOQueue.add(key); //reminder that updates are not synonymous to accesses, and this is why we do not change the position in the queue on updating.
+        }
+        valuePool.put(id, value, !idUsedAlready);
+    }
+
+    private void putInSingle(K key, ID id, T value) {
+
+        var keyAlreadyInThisCache = keyIdMapper.get(key);
+        if (keyAlreadyInThisCache != null && ((SingleIdWrapper) keyAlreadyInThisCache).getId().equals(id)) { //BUG AFTER DELETE TODO
+            return;
+        }
+        var usesOfIdInCache = numberOfUsesById.getOrDefault(id, 0); //In non-collection caches, a key corresponds to just one object, but one object may be referenced to by many keys.
+        var idAlreadyInCache = usesOfIdInCache > 0;
+
+        keyIdMapper.put(key, new SingleIdWrapper<>(id));
+        if (keyAlreadyInThisCache == null) {
+            concurrentFIFOQueue.add(key); //reminder that updates are not synonymous to accesses, and this is why we do not change the position in the queue on updating.
+        }
+        numberOfUsesById.put(id, ++usesOfIdInCache);
+        valuePool.put(id, value, !idAlreadyInCache);
+    }
+
+    private void removeOrDecrease(ID id) {
+        var numOfCollectionsUsingId = numberOfUsesById.getOrDefault(id, 0) - 1; //TODO: as is, or -1?
+        if (numOfCollectionsUsingId <= 0) {
+            numberOfUsesById.remove(id);
+            valuePool.removeOrDecreaseNumberOfUsesForId(id);
+        } else {
+            numberOfUsesById.put(id, numOfCollectionsUsingId);
+        }
+    }
+
+    private void localMapAdd(ID id) {
+        var numOfCollectionsUsingId = numberOfUsesById.getOrDefault(id, 0);
+        numberOfUsesById.put(id, ++numOfCollectionsUsingId);
+
     }
 
 }

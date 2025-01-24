@@ -2,7 +2,10 @@ package com.gmalandrakis.mnemosyne.core;
 
 import com.gmalandrakis.mnemosyne.structures.CacheValue;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class ValuePool<ID, T> {
@@ -34,15 +37,16 @@ public class ValuePool<ID, T> {
             this.valueMap.put(id, new CacheValue<>(value));
         else {
             cachedValue.updateValue(value);
+            if (newCache) {
+                this.valueMap.get(id).increaseNumberOfUses();
+            }
         }
-        if (newCache) {
-            this.valueMap.get(id).increaseNumberOfUses();
-        }
+
     }
 
     public Map<ID, Integer> removeOrDecreaseNumberOfUsesForIds(Collection<ID> ids) {
         var numberOfUsesPerIdMap = new HashMap<ID, Integer>();
-        ids.forEach(id->{
+        ids.forEach(id -> {
             numberOfUsesPerIdMap.put(id, removeOrDecreaseNumberOfUsesForId(id));
         });
         return numberOfUsesPerIdMap;

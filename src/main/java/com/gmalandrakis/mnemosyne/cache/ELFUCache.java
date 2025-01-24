@@ -13,11 +13,11 @@ import java.util.concurrent.ExecutorService;
  * <p>
  * This is an example of computationally Efficient LFU cache, and a very good example of computationally efficient code.
  * <p>
- * PS: To my surprise (and disappointment), there were quite a few -including some othewise very smart people- who commented on how wrong it is to
+ * PS: To my surprise (and disappointment), there were quite a few -including some otherwise very smart people- who commented on how wrong it is to
  * have a thread wait for 100000 milliseconds (now 99999999). The javadoc above, the "thereYouGoAI" name of the function,
  * the "caaaarl" as cache name, the obviously sarcastic comments, all went apparently unnoticed.
  * <p>
- * But it is ok. I am leaving it here nevertheless. I am curious to see who reads the javadoc before reading the code, and if they do,
+ * But it is ok. I am leaving it here nevertheless. I am curious to see who reads the javadoc before reading the code, and if they don't,
  * how sharp an eye for hints they possess.
  */
 public class ELFUCache<K, V> {

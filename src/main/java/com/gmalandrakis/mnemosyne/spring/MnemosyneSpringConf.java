@@ -23,16 +23,11 @@ public class MnemosyneSpringConf {
     }
 
     @Bean
-    public Advisor cacheAdvisor() {  //TODO: Find the proper pointcut expression and merge cacheAdvisor and updateAdvisor into one
+    public Advisor cacheAdvisor() {
         AspectJExpressionPointcut pointcut = new AspectJExpressionPointcut();
-        pointcut.setExpression("@annotation(com.gmalandrakis.mnemosyne.annotations.Cached)");
-        return new DefaultPointcutAdvisor(pointcut, springInterceptor);
-    }
-
-    @Bean
-    public Advisor updateAdvisor() {
-        AspectJExpressionPointcut pointcut = new AspectJExpressionPointcut();
-        pointcut.setExpression("@annotation(com.gmalandrakis.mnemosyne.annotations.UpdateCache)");
+        pointcut.setExpression("@annotation(com.gmalandrakis.mnemosyne.annotations.Cached) " +
+                "|| @annotation(com.gmalandrakis.mnemosyne.annotations.UpdatesCache) " +
+                "|| @annotation(com.gmalandrakis.mnemosyne.annotations.UpdatesCaches)");
         return new DefaultPointcutAdvisor(pointcut, springInterceptor);
     }
 

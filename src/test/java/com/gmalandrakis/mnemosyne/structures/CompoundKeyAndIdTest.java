@@ -26,6 +26,18 @@ public class CompoundKeyAndIdTest {
     }
 
     @Test
+    public void testOrdering() {
+        var str1 = new String("testString");
+
+        var compoundKeyObjects1 = new Object[]{"testString2", str1, null};
+        var compoundKeyObjects2 = new Object[]{str1, "testString2", null};
+        var compoundKey1 = new CompoundKey(compoundKeyObjects1);
+        var compoundKey2 = new CompoundKey(compoundKeyObjects2);
+        assert (!compoundKey1.equals(compoundKey2));
+
+    }
+
+    @Test
     public void testNumberHandling() {
         var compoundKeyObjects1 = new Object[]{1, 1L};
         var compoundKeyObjects2 = new Object[]{Integer.valueOf(1), Long.valueOf(1)};

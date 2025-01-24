@@ -4,74 +4,51 @@ import com.gmalandrakis.mnemosyne.core.ValuePool;
 import com.gmalandrakis.mnemosyne.exception.MnemosyneRetrievalException;
 import com.gmalandrakis.mnemosyne.structures.CacheParameters;
 import com.gmalandrakis.mnemosyne.structures.CollectionIdWrapper;
+import com.gmalandrakis.mnemosyne.structures.IdWrapper;
 import com.gmalandrakis.mnemosyne.structures.SingleIdWrapper;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
 //WIP
-public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {    //WIP
+public class LRUCacheold<K, ID, T> extends AbstractGenericCache<K, ID, T> {    //WIP
     //WIP
-    final ConcurrentLinkedQueue<K> recencyQueue = new ConcurrentLinkedQueue<>();
-    ;
+    final ConcurrentLinkedQueue<K> recencyQueue  = new ConcurrentLinkedQueue<>();;
     final ConcurrentHashMap<ID, Integer> IdAndNumberOfCollectionsUsingIt = returnsCollection ? new ConcurrentHashMap<ID, Integer>() : null; //Meaningless to use for values with a 1-1 correspondence between keys and IDs.
 
-    public LRUCache(CacheParameters cacheParameters, ValuePool poolService) {
+    public LRUCacheold(CacheParameters cacheParameters, ValuePool poolService) {
         super(cacheParameters, poolService);
     }
 
     @Override
     public void put(K key, ID id, T value) {
-        if (key == null || id == null) {
+        if (key == null || value == null) {
             return;
         }
-        if (recencyQueue.size() >= this.actualCapacity) {
-            this.evict();
+        if (recencyQueue.size() >= actualCapacity) {
+            this.evict(); //Ideally, this statement is never reached, and evict() is called by the internal threads before the size exceeds the capacity. But if multiple threads write concurrently in the cache, they will likely prevent the internal threads from evicting it.
         }
-
+        var existentIdWrapperForKey = keyIdMapper.get(key);
         if (returnsCollection) {
-            putInCollection(key, id, value);
+            if (existentIdWrapperForKey != null) {
+                ((CollectionIdWrapper) existentIdWrapperForKey).addToCollectionOrUpdate(id);
+            } else {
+                keyIdMapper.put(key, new CollectionIdWrapper<>(Collections.singleton(id)));
+            }
         } else {
-            putInSingle(key, id, value);
+            final ConcurrentHashMap<K, IdWrapper<ID>> keyIdMap;
+            valuePool.put(id, value, !idUsedAlready(id));
         }
+        recencyQueue.remove(key); //send to tail
+        recencyQueue.add(key);
 
     }
 
     @Override
-    public void putAll(K key, Map<ID, T> map) {
-        if (key == null || map == null) {
-            return;
-        }
+    public void putAll(K key, Map<ID, T> ids) {
 
-        if (!returnsCollection) {
-            map.forEach((id, val) -> {
-                put(key, id, val);
-            });
-            return;
-        }
-
-        if (recencyQueue.size() >= this.actualCapacity) {
-            this.evict();
-        }
-
-        var possibleValue = (CollectionIdWrapper<ID>) keyIdMapper.computeIfAbsent(key, k -> new CollectionIdWrapper<>());
-        possibleValue.addAllToCollectionOrUpdate(map.keySet());
-
-        if (!recencyQueue.contains(key)) {
-            recencyQueue.add(key);
-        }
-
-        map.forEach((id, val) -> {
-            var numberOfCollectionsUsingId = IdAndNumberOfCollectionsUsingIt.getOrDefault(id, 0);
-            var idUsedAlready = numberOfCollectionsUsingId != 0;
-            IdAndNumberOfCollectionsUsingIt.put(id, ++numberOfCollectionsUsingId);
-            valuePool.put(id, val, !idUsedAlready);
-        });
     }
 
 
@@ -123,20 +100,11 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {    //WI
         if (cacheData == null) {
             return;
         }
-        recencyQueue.remove(key);
         keyIdMapper.remove(key);
-
+        recencyQueue.remove(key);
         if (returnsCollection) {
-            Collection<ID> ids = ((CollectionIdWrapper) cacheData).getIds();
-            ids.forEach(id -> {
-                var numOfCollectionsUsingId = IdAndNumberOfCollectionsUsingIt.getOrDefault(id, 0) - 1;
-                if (numOfCollectionsUsingId <= 0) {
-                    IdAndNumberOfCollectionsUsingIt.remove(id);
-                    valuePool.removeOrDecreaseNumberOfUsesForId(id);
-                } else {
-                    IdAndNumberOfCollectionsUsingIt.put(id, numOfCollectionsUsingId);
-                }
-            });
+            var ids = ((CollectionIdWrapper) cacheData).getIds();
+            valuePool.removeOrDecreaseNumberOfUsesForIds(ids);
         } else {
             var id = (ID) ((SingleIdWrapper) cacheData).getId();
             valuePool.removeOrDecreaseNumberOfUsesForId(id);
@@ -145,7 +113,21 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {    //WI
 
     @Override
     public void removeOneFromCollection(K key, ID id) {
-
+        if (returnsCollection) {
+            if (key == null) {
+                for (K k : keyIdMapper.keySet()) {
+                    ((CollectionIdWrapper) keyIdMapper.get(k)).getIds().remove(id);
+                }
+            } else {
+                var cacheData = (CollectionIdWrapper) keyIdMapper.get(key);
+                if (cacheData == null) {
+                    return;
+                }
+                cacheData.getIds().remove(id);
+                recencyQueue.remove(key);
+            }
+            valuePool.removeOrDecreaseNumberOfUsesForId(id);
+        }
     }
 
     @Override
@@ -160,10 +142,9 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {    //WI
 
     @Override
     public void evict() {
-        if (timeToLive != Long.MAX_VALUE && timeToLive > 0) {
-            var expiredValues = keyIdMapper.entrySet().stream().filter(this::isExpired).map(Map.Entry::getKey); //Io sono una anatra
-            expiredValues.forEach(this::remove); //qifsha ropt
-        }
+        var expiredValues = keyIdMapper.entrySet().stream().filter(this::isExpired).map(Map.Entry::getKey); //Io sono una anatra
+        expiredValues.forEach(this::remove); //qifsha ropt
+
         if (recencyQueue.size() >= this.actualCapacity) {
             final float eviction = Math.max((totalCapacity * evictionStepPercentage / 100f), 1); //An tuxon to evictionStepPercentage einai mhdeniko, na afairethei toulaxiston ena entry
 
@@ -191,35 +172,5 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {    //WI
         //TODO
 
         return false;
-    }
-
-    private void putInCollection(K key, ID id, T value) {
-        var keyAlreadyInThisCache = recencyQueue.contains(key);
-        var idWrapper = (CollectionIdWrapper) keyIdMapper.computeIfAbsent(key, k -> new CollectionIdWrapper());
-
-        var numberOfCollectionsUsingId = IdAndNumberOfCollectionsUsingIt.getOrDefault(id, 0);
-        var idUsedAlready = numberOfCollectionsUsingId != 0;
-        IdAndNumberOfCollectionsUsingIt.put(id, ++numberOfCollectionsUsingId);
-
-        idWrapper.addToCollectionOrUpdate(id);
-
-        if (!keyAlreadyInThisCache) {
-            recencyQueue.add(key); //reminder that updates are not synonymous to accesses, and this is why we do not change the position in the queue on updating.
-        }
-        valuePool.put(id, value, !idUsedAlready);
-    }
-
-    private void putInSingle(K key, ID id, T value) {
-        var keyAlreadyInThisCache = recencyQueue.contains(key);
-        var existentIdWrapperForKey = keyIdMapper.get(key);
-
-        if (existentIdWrapperForKey == null) {
-            keyIdMapper.put(key, new SingleIdWrapper<>(id));
-        }
-
-        if (!keyAlreadyInThisCache) {
-            recencyQueue.add(key); //reminder that updates are not synonymous to accesses, and this is why we do not change the position in the queue on updating.
-        }
-        valuePool.put(id, value, !keyAlreadyInThisCache);
     }
 }

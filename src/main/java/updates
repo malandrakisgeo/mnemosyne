@@ -52,3 +52,19 @@ public Transaction createPendingTransaction(@UpdateKey(name="id") UUID uuid)
 @UpdatesCache(name="getPendingTransactions", remove=true)
 public void completeTransaction(@UpdatedValue Transaction transaction)
 
+
+    @UpdateCache(name = "getTransactionsBySeller", removesValueFromAllCollections = true)
+    @UpdateCache(name = "getById", keys = "id", remove = true)
+    public void deleteMe(@UpdatedValue Transaction transaction) {
+    }
+
+    @UpdateCache(name = "getTransactionsBySeller", removesValueFromAllCollections = true)
+    @UpdateCache(name = "getById", keys = "id", remove = true)
+    public void deleteMe(@UpdatedValue Transaction transaction) {
+    }
+
+
+    @UpdateCache(name = "getTransactionsBySeller", removesValueFromAllCollections = true)
+    @UpdateCache(name = "getById", keys = "id", remove = true)
+    public void deleteMe(@UpdatedValue Transaction transaction) {
+    }

@@ -312,7 +312,17 @@ Same applies when collections are used as keys.
 
 
 
-
+            In non-collection caches, there is a 1-1 correlation between a key and an ID.
+            Which means that, at a first glance, the presence of a key in the FIFOcache should be
+            synonymous the ID being present in the value pool.
+            But what happens if the underlying method decided to associate the key with a new ID that did not exist here before?
+            On the other hand, if the method had already returned a value for that key, it has to be evicted first before the
+            cache puts a key with a new ID.
+            For the time being, the presence of a key in the cache is indeed synonymous with the ID existing already.
+            But the questions above leads us to another idea and possible feature: evicting the cache on demand,
+            e.g. by the presence of a non-null argument annotated with an @EvictOn: annotation.
+            This should indeed allow for a key to be associated with a brand new id before the value expires by itself, and the logic
+            behind keyAlreadyInThisCache should change!
 
 
 
@@ -376,3 +386,5 @@ public void completeTransaction(@UpdatedValue Transaction transaction)
 
 
          */
+
+

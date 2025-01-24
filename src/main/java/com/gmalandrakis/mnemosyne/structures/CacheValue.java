@@ -6,7 +6,7 @@ public class CacheValue<T> {
 
     public CacheValue(T t) {
         this.value = t;
-        cachesUsingValue = 0; //incrementCaches is manually called after creation.
+        cachesUsingValue = 1; //manually increased or decreased afterwards by the ValuePool
     }
 
     public synchronized int increaseNumberOfUses() {

@@ -1,6 +1,7 @@
 package com.gmalandrakis.mnemosyne.core;
 
-import com.gmalandrakis.mnemosyne.annotations.UpdateCache;
+import com.gmalandrakis.mnemosyne.annotations.UpdatesCache;
+import com.gmalandrakis.mnemosyne.annotations.UpdatesCache.RemoveMode;
 import com.gmalandrakis.mnemosyne.cache.AbstractGenericCache;
 import com.gmalandrakis.mnemosyne.cache.AbstractMnemosyneCache;
 import com.gmalandrakis.mnemosyne.structures.CompoundKey;
@@ -14,6 +15,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+/**
+ * A proxy service standing between method invocations and cache implementations.
+ *
+ * @author George Malandrakis (malandrakisgeo@gmail.com)
+ */
 @SuppressWarnings({"unchecked", "raw"})
 public class MnemoProxy<K, ID, V> {
 
@@ -70,28 +76,41 @@ public class MnemoProxy<K, ID, V> {
         }
     }
 
+    void removeIds(Set<ID> ids, UpdatesCache updateCache) {
+        if (updateCache.removeMode().equals(RemoveMode.REMOVE_VALUE_FROM_ALL_COLLECTIONS)) {
+            ids.forEach(id -> cache.removeOneFromCollection(null, id));
+
+            return;
+        }
+    }
+
     //Keep in mind that we don't need to update the valuePool again. It is already updated by the handling of UpdatedValue-annotation
-    void updateCacheKeysAndIds(K key, Map<ID, V> idValueMap, UpdateCache updateCache) {
-        if (key == null || idValueMap == null || updateCache == null) {
-            return;
-        }
+    void updateCacheKeysAndIds(K key, Map<ID, V> idValueMap, UpdatesCache updateCache) {
+        var removeMode = updateCache.removeMode();
         // this.executorService.execute(() -> { //TODO: Decide whether this should run in another thread to avoid delays
-        if (updateCache.removesValueFromSingleCollection()) {
+        if (key != null && returnsCollections && removeMode.equals(RemoveMode.REMOVE_VALUE_FROM_SINGLE_COLLECTION)) {
             //TODO
+            idValueMap.keySet().forEach(id -> cache.removeOneFromCollection(key, id));
             return;
         }
 
-        if (updateCache.removesValueFromAllCollections()) {
-            //todo
+        if (specialCollectionHandlingEnabled && removeMode.equals(RemoveMode.REMOVE_VALUE_FROM_ALL_COLLECTIONS)) {
+            idValueMap.keySet().forEach(id -> cache.removeOneFromCollection(null, id));
+
             return;
         }
 
-            if (returnsCollections) {
-                cache.putAll(key, idValueMap);
-            } else {
-                var singleKey = idValueMap.keySet().stream().toList().get(0);
-                cache.put(key, singleKey, valuePool.getValue(singleKey));
-            }
+        if (removeMode.equals(RemoveMode.REMOVE_KEY)) {
+            cache.remove(key);
+            return;
+        }
+
+        if (returnsCollections) {
+            cache.putAll(key, idValueMap);
+        } else {
+            var singleKey = idValueMap.keySet().stream().toList().get(0);
+            cache.put(key, singleKey, valuePool.getValue(singleKey));
+        }
 
         //});
     }
@@ -125,12 +144,10 @@ public class MnemoProxy<K, ID, V> {
     private Collection<V> getMultiple(CompoundKey compoundKey, Object invocationTargetObject, Object... args) {
         var value = invokeUnderlyingMethod(invocationTargetObject, args);
         if (value != null) {
-           // assert (Collection.class.isAssignableFrom(value.getClass()));
-            assert(value instanceof Collection);
-            var valueCollection = (Collection<V>) value;
+            assert (value instanceof Collection);
             var map = (Map<ID, V>) GeneralUtils.deduceId(value);
             cache.putAll((K) compoundKey, map);
-            return valueCollection;
+            return (Collection<V>) value;
         }
         return null;
     }
@@ -139,7 +156,7 @@ public class MnemoProxy<K, ID, V> {
     private Collection<V> getMultipleSpecial(CompoundKey compoundKey, Object invocationTargetObject, Object... args) {
         assert (specialCollectionHandlingEnabled && compoundKey.getKeyObjects().length == 1
                 && compoundKey.getKeyObjects()[0] instanceof Collection && args.length == 1); //A very specific but very common subcase: calling a repository or rest-api method with a single Collection of IDs as argument
-        var returnTypeIsList =  List.class.isAssignableFrom(forMethod.getReturnType());
+        var returnTypeIsList = List.class.isAssignableFrom(forMethod.getReturnType());
         var keyTypeIsList = compoundKey.getKeyObjects()[0] instanceof List; // //Reminder that the Collection here may be only Set or List.
         var keys = (List<K>) compoundKey.getKeyObjects()[0]; //In this case, the compoundKey is not the key itself: it contains a Collection of the actual keys instead, created from the arguments given, treated here as List.
         List<K> failedKeys = Collections.synchronizedList(new ArrayList<K>()); //a list with the keys that did not return a value, i.e. returned empty collection or null.
@@ -165,8 +182,8 @@ public class MnemoProxy<K, ID, V> {
                                 if (value == null) {
                                     totalResult.put(failedKey, null);
                                 } else {
-                                   // assert (Collection.class.isAssignableFrom(value.getClass())); //TODO: Add this to generalControls and delete here.
-                                    assert(value instanceof Collection);
+                                    // assert (Collection.class.isAssignableFrom(value.getClass())); //TODO: Add this to generalControls and delete here.
+                                    assert (value instanceof Collection);
                                     var valueCollection = (Collection<V>) value;
                                     if (valueCollection.isEmpty()) {
                                         //Add nothing to the cache or the result. It is apparent that the method is "null-aversive" and just ignores the values that were not found. So just do the same.

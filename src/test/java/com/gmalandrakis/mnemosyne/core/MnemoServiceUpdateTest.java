@@ -1,7 +1,7 @@
 package com.gmalandrakis.mnemosyne.core;
 
 import com.gmalandrakis.mnemosyne.annotations.Cached;
-import com.gmalandrakis.mnemosyne.annotations.UpdateCache;
+import com.gmalandrakis.mnemosyne.annotations.UpdatesCache;
 import com.gmalandrakis.mnemosyne.annotations.UpdateKey;
 import com.gmalandrakis.mnemosyne.annotations.UpdatedValue;
 import org.junit.Test;
@@ -35,12 +35,12 @@ public class MnemoServiceUpdateTest {
 
         mnemoService.invokeMethodAndUpdate(updater, innerClass, cust);
 
-        assert (mnemoService.tryFetchFromCache(test9Proxy, str.toString()) != null); //tryFetchFromCache exists for this type of test: we would have to rewrite/mock the whole process of generating compoundKeys etc without it.
+        assert (mnemoService.tryFetchFromCache(test9Proxy, str.toString()) != null);
 
         var listResult = mnemoService.tryFetchFromCache(getByAgeAndActivatedProxy, 18, false);
 
-        assert (listResult != null); //tryFetchFromCache exists for this type of test: we would have to rewrite/mock the whole process of generating compoundKeys etc without it.
-        assert (List.class.isAssignableFrom(listResult.getClass())); //tryFetchFromCache exists for this type of test: we would have to rewrite/mock the whole process of generating compoundKeys etc without it.
+        assert (listResult != null);
+        assert (List.class.isAssignableFrom(listResult.getClass()));
         assert (((List) listResult).size() == 1);
 
     }
@@ -111,18 +111,16 @@ public class MnemoServiceUpdateTest {
 
         //   @UpdateCache(name = "getByAgeActivatedOnly", targetObjectKeys = {"age"}, conditionalAdd = "activated", conditionalDelete = "!activated")
         //   @UpdateCache(name = "getByAgeAndActivated", targetObjectKeys = {"age", "accountActivated"})
-        @UpdateCache(name = "getByAgeAndActivated", targetObjectKeys = {"age", "accountActivated"})
-        //TODO: Ignore null values
-        @UpdateCache(name = "test9", targetObjectKeys = "id")
-        //TODO: Verify the targetObjectKeys exist in the target class.
+        @UpdatesCache(name = "getByAgeAndActivated", targetObjectKeys = {"age", "accountActivated"})
+        @UpdatesCache(name = "test9", targetObjectKeys = "id")
         public String updateTest9(@UpdatedValue Customer i) {
             return i.getName();
         }
 
 
-        @UpdateCache(name = "test9", keys = "testKey")
+        @UpdatesCache(name = "test9", annotatedKeys = "testKey")
         @Cached(cacheName = "testUpdate")
-        public String update9Test2(@UpdateKey(name = "testKey") Integer i) {
+        public String update9Test2(@UpdateKey(keyId = "testKey") Integer i) {
             if (i == 1) {
                 return "Yey!";
             }
@@ -139,8 +137,8 @@ public class MnemoServiceUpdateTest {
             return Collections.singletonList("Yoy");
         }
 
-        @UpdateCache(name = "test10", keys = "testKey")
-        public List<String> test10Updater(@UpdatedValue List<String> str, @UpdateKey(name = "testKey") Integer i) {
+        @UpdatesCache(name = "test10", annotatedKeys = "testKey")
+        public List<String> test10Updater(@UpdatedValue List<String> str, @UpdateKey(keyId = "testKey") Integer i) {
             return null;
         }
 

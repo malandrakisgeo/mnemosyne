@@ -5,7 +5,13 @@ import java.util.Collections;
 import java.util.HashSet;
 
 public class CollectionIdWrapper<ID> extends IdWrapper<ID> {
-    Collection<ID> collection;
+    Collection<ID> collection  = Collections.synchronizedSet(new HashSet<ID>());
+
+    public CollectionIdWrapper(){
+        //should only be used only in e.g. computeIfAbsent
+        this.createdOn = System.currentTimeMillis();
+        this.lastAccessed = createdOn;
+    }
 
     public CollectionIdWrapper(Collection<ID> objs) {
         this.collection = Collections.synchronizedSet(new HashSet<ID>(objs));
@@ -14,11 +20,6 @@ public class CollectionIdWrapper<ID> extends IdWrapper<ID> {
     }
 
     public void addAllToCollectionOrUpdate(Collection<ID> id) {
-        updateLastAccessed();
-
-        if (collection == null) {
-            collection = Collections.synchronizedSet(new HashSet<ID>());
-        }
         collection.addAll(id);
     }
 

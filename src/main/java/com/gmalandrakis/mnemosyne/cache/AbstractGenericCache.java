@@ -16,8 +16,6 @@ public abstract class AbstractGenericCache<K, ID, V> extends AbstractMnemosyneCa
 
     final ValuePool<ID, V> valuePool;
 
-    //final ConcurrentHashMap<K, IdWrapper<ID>> keyIdMap;
-
     final String name;
     final boolean countdownFromCreation;
     final long timeToLive;
@@ -32,7 +30,7 @@ public abstract class AbstractGenericCache<K, ID, V> extends AbstractMnemosyneCa
 
     public AbstractGenericCache(CacheParameters parameters, ValuePool<ID, V> valuePool) {
         super();
-        //this.keyIdMap = new ConcurrentHashMap<>();
+        this.keyIdMapper = new ConcurrentHashMap<>();
         this.valuePool = valuePool;
         this.totalCapacity = (parameters.getCapacity() <= 0 ? Integer.MAX_VALUE : parameters.getCapacity());
         this.timeToLive = (parameters.getTimeToLive() <= 0 ? Long.MAX_VALUE : parameters.getTimeToLive());
@@ -85,7 +83,7 @@ public abstract class AbstractGenericCache<K, ID, V> extends AbstractMnemosyneCa
      */
     protected void forcedInvalidation() {
         while (true) {
-            GeneralUtils.sleepUninterrupted(timeToLive);
+            GeneralUtils.sleepUninterrupted(invalidationInterval);
             invalidateCache();
         }
     }
