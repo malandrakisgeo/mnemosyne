@@ -30,7 +30,7 @@ public abstract class IdWrapper<ID> {
      * By default, this will be increased only on explicit gets, not on updates. The logic behind
      * this choice is that updates can come from automated procedures and are not synonymous to explicit accesses by users.
      * <p>
-     * Use explicit calls to increaseHits() in custom implementations of AbstractMnemosyneCache for updating the timestamp even when updating the value.
+     * You may use explicit calls to increaseHits() in custom implementations of AbstractMnemosyneCache for updating the timestamp even when updating the value.
      */
     int hits;
 

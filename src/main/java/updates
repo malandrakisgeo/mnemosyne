@@ -1,3 +1,4 @@
+
 Cached methods:
 Transaction getTransactionById(UUID transactionId);
 List<Transaction> getTransactionsBySeller(String username);

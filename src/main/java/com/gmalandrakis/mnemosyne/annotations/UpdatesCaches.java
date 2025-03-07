@@ -9,7 +9,7 @@ import static java.lang.annotation.ElementType.METHOD;
 @Retention(RetentionPolicy.RUNTIME)
 @Target({METHOD})
 
-public  @interface UpdatesCaches {
+public @interface UpdatesCaches {
 
     UpdatesCache[] value();
 }

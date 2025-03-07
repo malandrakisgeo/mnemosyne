@@ -40,7 +40,7 @@ public abstract class AbstractGenericCache<K, ID, V> extends AbstractMnemosyneCa
         this.preemptiveEvictionPercentage = (parameters.getPreemptiveEvictionPercentage() <= 0 || parameters.getPreemptiveEvictionPercentage() >= 100 ? 100 : parameters.getPreemptiveEvictionPercentage());
         this.evictionStepPercentage = (parameters.getEvictionStepPercentage() < 0 || parameters.getEvictionStepPercentage() > 100) ? 0 : parameters.getEvictionStepPercentage();
         this.actualCapacity = (totalCapacity * (preemptiveEvictionPercentage / 100f));
-        if (parameters.getThreadPoolSize() != 0 && parameters.getThreadPoolSize() > 5) {
+        if (parameters.getThreadPoolSize() > 5) {
             internalThreadService = Executors.newFixedThreadPool(parameters.getThreadPoolSize());
         } else {
             internalThreadService = Executors.newCachedThreadPool();

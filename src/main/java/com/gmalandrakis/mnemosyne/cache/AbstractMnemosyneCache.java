@@ -4,7 +4,7 @@ import com.gmalandrakis.mnemosyne.structures.IdWrapper;
 
 import java.util.Collection;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
 
 /**
@@ -25,12 +25,6 @@ public abstract class AbstractMnemosyneCache<K, ID, V> {
      */
     ConcurrentMap<K, IdWrapper<ID>> keyIdMapper;
 
-    /**
-     *
-     * @param key
-     * @param ídValueMap
-     */
-    public abstract void putAll(K key, Map<ID,V> ídValueMap);
 
     /**
      * Adds the given key-value pair to the cache.
@@ -39,6 +33,14 @@ public abstract class AbstractMnemosyneCache<K, ID, V> {
      * @param value
      */
     public abstract void put(K key, ID id, V value);
+
+    /**
+     * @param key
+     * @param ídValueMap
+     */
+    public abstract void putAll(K key, Map<ID, V> ídValueMap);
+
+    public abstract void putInAllCollections(ID id, V value);
 
     public abstract Collection<V> getAll(K key);
 
@@ -73,6 +75,8 @@ public abstract class AbstractMnemosyneCache<K, ID, V> {
      */
     public abstract void removeOneFromCollection(K key, ID id);
 
+    public abstract void removeFromAllCollections(ID id);
+
 
     /**
      * @return the name of the eviction algorithm
@@ -96,5 +100,10 @@ public abstract class AbstractMnemosyneCache<K, ID, V> {
      * Invalidates cache completely.
      */
     public abstract void invalidateCache();
+
+    /**
+     * Returns whether the ID is already used by the cache.
+     */
+    abstract boolean idUsedAlready(ID id);
 
 }

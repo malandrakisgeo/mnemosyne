@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 import static com.gmalandrakis.mnemosyne.utils.ParameterUtils.annotationValuesToCacheParameters;
 
 /**
- * A substantial part of the mnemosyne library. It generates {@link MnemoProxy proxy objects} for all the cached methods
+ * Generates {@link MnemoProxy proxy objects} for all the cached methods
  * and stores them in a HashMap,
  * implements the logic behind cache requests and methods request, and updates the target caches on cache miss,
  * and updates all necessary caches on {@link UpdatesCache @UpdateCache}
@@ -50,12 +50,12 @@ public class MnemoService {
         return object;
     }
 
-    public Object fetchFromCacheOrInvokeMethodAndUpdate(Method method, Object obj, Object... args) {
+    public Object fetchFromCacheOrInvokeMethodAndUpdate(Method method, Object... args) {
         var cacheProxy = proxies.get(method);
         assert (cacheProxy != null);
         Object result = tryFetchFromCache(cacheProxy, args);
         if (result == null) {
-            result = cacheProxy.getFromUnderlyingMethodAndUpdateMainCache(obj, args);
+            result = cacheProxy.getFromUnderlyingMethodAndUpdateMainCache(args);
             final var threadResult = result;
             //threadPool.execute(() -> { //We want to update all related caches, without delaying returning
             updateRelatedCaches(method, threadResult, args); // //TODO: Decide whether this should run in threadPool.execute to avoid delays
@@ -79,57 +79,64 @@ public class MnemoService {
         }
     }
 
-    private void updateRelatedCache(UpdatesCache updateCache, Method method, Object possibleUpdatedValue, Object... args) {
-        Object updatedValue = getAnnotatedUpdatedValue(method, args); // check if any of the args is annotated as @UpdatedValue.
-        if (updatedValue == null && possibleUpdatedValue == null) {//If neither an @UpdatedValue is present, nor an updatedCacheValue was given, there is nothing to do.
-            return;
-        }
+    //TODO: Simplify the flow here
+    private void updateRelatedCache(UpdatesCache updateCache, Method invokedMethod, Object possibleUpdatedValue, Object... args) {
+        Object updatedValue = getAnnotatedUpdatedValue(invokedMethod, args); // check if any of the args is annotated as @UpdatedValue.
 
         if (updatedValue == null) {
-            updatedValue = possibleUpdatedValue; // Which means that if there is any @UpdatedValue in the arguments, the result of the method is not used for updates!. TODO: Write documentation
+            updatedValue = possibleUpdatedValue; // Which means that if there is any @UpdatedValue in the arguments, the result of the method is not used for updates!.
         }
 
         var idOfUpdatedValue = GeneralUtils.deduceId(updatedValue);
         final Object finalUpdatedValue = updatedValue;
+
         var cacheToBeUpdated = this.cachesByName.get(updateCache.name());
 
         assert (cacheToBeUpdated != null);
+        var cachedMethod = cacheToBeUpdated.getCachedMethod();
 
         var targetObjectKeyNamesAndValues = updateCache.targetObjectKeys();
         var targetKeyNamesAndValues = linkTargetObjectKeysToObjects(List.of(targetObjectKeyNamesAndValues), finalUpdatedValue);
-        var annotatedKeyNamesAndValues = getUpdateKeyNamesAndCorrespondingValues(method, updateCache.annotatedKeys(), args);
-        var key = getCompoundKeyForUpdate(annotatedKeyNamesAndValues, targetKeyNamesAndValues, updateCache.keyOrder());
+        var annotatedKeyNamesAndValues = getUpdateKeyNamesAndCorrespondingValues(invokedMethod, updateCache.annotatedKeys(), args);
 
-        //      var conditionalAdd = getCondition(updateCache.conditionalAdd(), annotatedKeyNamesAndValues, targetKeyNamesAndValues);
-        //     var conditionalDelete = getCondition(updateCache.conditionalDelete(), annotatedKeyNamesAndValues, targetKeyNamesAndValues);
+        var conditionalRemoval = getCondition(updateCache.conditionalRemove(), annotatedKeyNamesAndValues, updatedValue, updateCache.conditionalANDGate());
+        var conditionalAdd = getCondition(updateCache.conditionalAdd(), annotatedKeyNamesAndValues, updatedValue, updateCache.conditionalANDGate());
+        var key = getCompoundKeyForUpdate(annotatedKeyNamesAndValues, targetKeyNamesAndValues, updateCache.keyOrder(), cachedMethod, cacheToBeUpdated.isSpecialCollectionHandlingEnabled());
 
-        //var key = refineCompoundKey(compoundKey);
-
-
+        if (idOfUpdatedValue == null && updatedValue == null) { //this can only happen on key removal.
+            cacheToBeUpdated.updateByRemoving(key, null, conditionalRemoval, updateCache.removeMode());
+            return;
+        }
         if (idOfUpdatedValue instanceof Map) {
-            cacheToBeUpdated.updateCacheKeysAndIds(key, (Map) idOfUpdatedValue, updateCache);
+            cacheToBeUpdated.updateByRemoving(key, (Map) idOfUpdatedValue, conditionalRemoval, updateCache.removeMode());
+            cacheToBeUpdated.updateByAdding(key, (Map) idOfUpdatedValue, conditionalAdd, updateCache.addMode());
+
         } else {
-            cacheToBeUpdated.updateCacheKeysAndIds(key, Map.of(idOfUpdatedValue, updatedValue), updateCache);
+            cacheToBeUpdated.updateByRemoving(key, Map.of(idOfUpdatedValue, updatedValue), conditionalRemoval, updateCache.removeMode());
+            cacheToBeUpdated.updateByAdding(key, Map.of(idOfUpdatedValue, updatedValue), conditionalAdd, updateCache.addMode());
         }
     }
 
-    public List<MnemoProxy> generateCachesForClass(Class<?> clazz) {
+    public List<MnemoProxy> generateCachesForBean(Object singletonBean) {
+        var clazz = singletonBean.getClass();
+
         return Arrays.stream(clazz.getDeclaredMethods())
                 .filter(m -> m.getAnnotation(Cached.class) != null)
-                .map(this::generateForMethod)
+                .map(m -> this.generateForMethod(m, singletonBean))
                 .toList();
     }
 
-    public void generateUpdatesForClass(Class<?> clazz) {
+    public void generateUpdatesForBean(Object singletonBean) {
+        var clazz = singletonBean.getClass();
         Arrays.stream(clazz.getDeclaredMethods())
                 .filter(m -> m.getAnnotation(UpdatesCache.class) != null)
                 .forEach(this::generateUpdaterForMethod);
     }
 
-    MnemoProxy generateForMethod(Method method) {
+    MnemoProxy generateForMethod(Method method, Object singletonBean) {
         var annotation = method.getAnnotation(Cached.class);
         if (annotation != null) {
-            return generateInternal(method, annotation);
+            return generateInternal(method, singletonBean);
         }
         return null;
     }
@@ -168,20 +175,46 @@ public class MnemoService {
 
     }
 
-    private boolean getCondition(String[] conditionalAdd, Map<String, Object> annotatedKeyNamesAndValues, Map<String, Object> targetKeyNamesAndValues) {
+    private Boolean getCondition(String[] conditions, Map<String, Object> annotatedKeyNamesAndValues, Object updatedObject, boolean conditionalAND) {
+        if (conditions == null || (conditions.length == 1 && conditions[0].isEmpty())) {
+            return null;
+        }
 
-        /*
-            For each conditionalAdd string:
-            0. If conditionalAdd contains only "", return.
-            1. Check if it exists in the annotatedKeyNamesAndValues and is a boolean. Fetch if it does.
-            2. Repeat for targetObjectKeys and targetObjects.
-            (2a. if a conditionalAdd exists in both lists but has different values, throw an exception).
-            3. Do a logical AND for all the aforementioned booleans.
-         */
-        return false;
+        List<Boolean> booleans = new ArrayList<>();
+        for (String possibleFieldName : conditions) {
+            String fieldName = possibleFieldName;
+            boolean negated = possibleFieldName.startsWith("!");
+            if (negated) {
+                fieldName = fieldName.substring(1);
+            }
+            var annotatedObject = annotatedKeyNamesAndValues.get(fieldName);
+          /*  if (targetObject != null && annotatedObject != null) {
+                if (boolean.class.isAssignableFrom(annotatedObject.getClass()) && boolean.class.isAssignableFrom(targetObject.getClass())) {
+                    throw new RuntimeException("Condition error: two boolean conditions with the same name");
+                }
+            }*/
+            if (annotatedObject != null && Boolean.class.isAssignableFrom(annotatedObject.getClass())) {
+                booleans.add(negated != (Boolean) annotatedObject);
+            }
+
+            if (updatedObject != null) {
+                var updated = GeneralUtils.tryGetField(updatedObject, fieldName);
+                if (updated != null && Boolean.class.isAssignableFrom(updated.getClass())) {
+                    booleans.add(negated != (Boolean) updated);
+                }
+            }
+        }
+        if (conditionalAND) {
+            return !booleans.isEmpty() && !booleans.contains(Boolean.FALSE);
+        } else {
+            return !booleans.isEmpty() && booleans.contains(Boolean.TRUE); //conditional OR
+        }
+
     }
 
-    private MnemoProxy generateInternal(Method method, Cached annotation) {
+    private MnemoProxy generateInternal(Method method, Object singletonBean) {
+        var annotation = method.getAnnotation(Cached.class);
+
         if (annotation == null || method == null) {
             return null;
         }
@@ -201,7 +234,7 @@ public class MnemoService {
         } catch (Exception e) {
             throw new MnemosyneRuntimeException(e);
         }
-        var proxyService = new MnemoProxy<>(cache, method, valuePool, returnsCollection, handleCollectionKeysSeparately);
+        var proxyService = new MnemoProxy<>(cache, method, singletonBean, valuePool, returnsCollection, handleCollectionKeysSeparately);
 
         proxies.put(method, proxyService);
         cachesByName.put(annotation.cacheName(), proxyService);
@@ -251,10 +284,22 @@ public class MnemoService {
             if (moreThanOneAnnotationsPresentInParameterList(method, UpdatedValue.class)) {
                 throw new MnemosyneUpdateException("At most one UpdatedValue allowed");
             }
-            //TODO: Exception when two @UpdateCache check the same cache
+
+            if (updateCache.removeMode() == UpdatesCache.RemoveMode.NONE && updateCache.addMode() == UpdatesCache.AddMode.NONE) {
+                throw new MnemosyneUpdateException("Invalid update mode: make sure you chose the proper RemoveMode or AddMode.");
+            }
+
+            if (updateCache.removeMode() != UpdatesCache.RemoveMode.NONE && updateCache.addMode() != UpdatesCache.AddMode.NONE) {
+                var condAdd = updateCache.conditionalAdd();
+                var condRem = updateCache.conditionalRemove();
+                if (condAdd.length == 1 && condAdd[0].isEmpty() && condRem.length == 1 && condRem[0].isEmpty()) {
+                    throw new MnemosyneUpdateException("An UpdatesCache with no define conditions either adds or removes."); //TODO: test
+                }
+            }
+
+            //TODO: Multiple updatesCache for the same target method is allowed, but what if they clash? See if it is better to check for controls, disable multiple updatesCache for the same  target method, or just print a warning.
         }
     }
-
 
     private boolean moreThanOneAnnotationsPresentInParameterList(Method method, Class<?> annotationType) {
         var paramannot = method.getParameterAnnotations();
@@ -283,7 +328,6 @@ public class MnemoService {
             }
             i += 1;
         }
-
         return null;
     }
 
@@ -292,17 +336,23 @@ public class MnemoService {
         if (targetObject != null) {
             for (String keyName : targetObjectKeys) {
                 if (!keyName.isEmpty()) {
-                    map.put(keyName, GeneralUtils.tryGetObject(targetObject, keyName));
+                    map.put(keyName, GeneralUtils.getFieldOrThrow(targetObject, keyName));
                 }
             }
         }
         return map;
     }
 
-    private CompoundKey getCompoundKeyForUpdate(LinkedHashMap<String, Object> annotatedKeyNamesAndValues, LinkedHashMap<String, Object> targetKeyNamesAndValues, String[] names) {
+    /*
+        testfall:
+        1. mia methodos pairnei ena set ws argument.
+        2. Mia allh methodos kanei @UpdatesValue th prwth.
+        3. Doulevei.
+     */
+    private CompoundKey getCompoundKeyForUpdate(LinkedHashMap<String, Object> annotatedKeyNamesAndValues, LinkedHashMap<String, Object> targetKeyNamesAndValues,
+                                                String[] names, Method cachedMethod, boolean specialHandling) {
         List<Object> keyObjects = new ArrayList<>();
-
-        if (!annotatedKeyNamesAndValues.isEmpty() && !targetKeyNamesAndValues.isEmpty()) {
+        if (annotatedKeyNamesAndValues != null && targetKeyNamesAndValues != null && !annotatedKeyNamesAndValues.isEmpty() && !targetKeyNamesAndValues.isEmpty()) {
             for (String name : names) {
                 var annotatedValue = annotatedKeyNamesAndValues.get(name);
                 var targetValue = targetKeyNamesAndValues.get(name);
@@ -316,13 +366,49 @@ public class MnemoService {
                 }
             }
         } else {
-            annotatedKeyNamesAndValues.keySet().forEach(keyName -> {
-                keyObjects.add(annotatedKeyNamesAndValues.get(keyName));
-            });
+            //TODO: Delete this disgrace and replace with something less crappy, that handles implementations of Set and List too.
+            boolean keyIsASet = false;
+            boolean keyIsAList = false;
+            if (cachedMethod.getParameters().length == 1) {
+                keyIsASet = Set.class.isAssignableFrom(cachedMethod.getParameters()[0].getType())  && !specialHandling; //special collection handling internally uses only the values each by each, without wrapping them as Sets or Lists.
+                keyIsAList = List.class.isAssignableFrom(cachedMethod.getParameters()[0].getType())  && !specialHandling;
+            }
+            /*
+                The reason for the code below is that a CompoundKey that contains an object A is different from a compoundKey containing a List or a Set with an object A.
+                If a cached function takes a list as an argument and the value A is cached in a list, a CompoundKey(List(A)) is needed. CompoundKey(A) will not yield a result.
+             */
+            Set hashSet = new HashSet();
+            List arrayList = new ArrayList();
 
-            targetKeyNamesAndValues.keySet().forEach(keyName -> {
-                keyObjects.add(targetKeyNamesAndValues.get(keyName));
-            });
+            var linkedHashMaps = new LinkedHashMap[]{annotatedKeyNamesAndValues, targetKeyNamesAndValues};
+            //TODO: Bug to fix: this does not take into account separate handling collections. Pithanotata oute kai o parapanw kwdikas
+            if (keyIsASet) {
+                for (LinkedHashMap linkedHashMap : linkedHashMaps) {
+                    if (linkedHashMap != null) {
+                        linkedHashMap.keySet().forEach(keyName -> {
+                            hashSet.add(linkedHashMap.get(keyName));
+                        });
+                    }
+                }
+                keyObjects.add(hashSet);
+            }else if (keyIsAList) {
+                for (LinkedHashMap linkedHashMap : linkedHashMaps) {
+                    if (linkedHashMap != null) {
+                        linkedHashMap.keySet().forEach(keyName -> {
+                            arrayList.add(linkedHashMap.get(keyName));
+                        });
+                    }
+                }
+                keyObjects.add(arrayList);
+            }else{
+                for (LinkedHashMap linkedHashMap : linkedHashMaps) {
+                    if (linkedHashMap != null) {
+                        linkedHashMap.keySet().forEach(keyName -> {
+                            keyObjects.add(linkedHashMap.get(keyName));
+                        });
+                    }
+                }
+            }
         }
 
         return new CompoundKey(keyObjects.toArray());

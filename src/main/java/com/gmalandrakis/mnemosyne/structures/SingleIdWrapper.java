@@ -12,7 +12,7 @@ public class SingleIdWrapper<ID> extends IdWrapper<ID> {
 
     public ID getId() {
         hits += 1;
-        updateLastAccessed();
+        this.lastAccessed = System.currentTimeMillis();
 
         return singleId;
     }

@@ -9,11 +9,9 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class GeneralUtils {
@@ -45,7 +43,7 @@ public class GeneralUtils {
         var idField = Stream.concat(fields, decfields)
                 .filter(field -> field.getAnnotation(Id.class) != null).toList();
         idField.forEach(ids -> {
-            var idObject = tryGetObject(object, ids.getName());
+            var idObject = getFieldOrThrow(object, ids.getName());
             idObjects.add(idObject);
         });
         if (idObjects.isEmpty()) {
@@ -58,8 +56,8 @@ public class GeneralUtils {
 
     @SuppressWarnings("unchecked")
     public static CompoundKey deduceCompoundKeyFromMethodAndArgs(Method method, Object[] args) {
-        if (method == null || args == null || args.length == 0) {
-            return new CompoundKey(new Object[0]);
+        if (args == null || args.length == 0) {
+            return new CompoundKey(new Object[0]); //handling for methods with no keys (e.g. returning the same list everytime)
         }
         var parameterAnnotations = method.getParameterAnnotations();
         var keys = new ArrayList<Object>();
@@ -77,7 +75,6 @@ public class GeneralUtils {
 
         return keys.isEmpty() ? new CompoundKey(args) : new CompoundKey(keys.toArray());
     }
-
 
     public static void sleepUninterrupted(long sleepTime) {
         boolean sleepComplete = false;
@@ -115,18 +112,32 @@ public class GeneralUtils {
 
     static Object tryGetIDField(Object targetObject) { //This is a final resort in case there are no fields annotated as @Id. TODO: improve
         try {
-            return tryGetObject(targetObject, "Id");
+            return getFieldOrThrow(targetObject, "Id");
         } catch (Exception e) {
             try {
-                return tryGetObject(targetObject, "ID");
+                return getFieldOrThrow(targetObject, "ID");
             } catch (Exception ee) {
-                return tryGetObject(targetObject, "id");
+                return getFieldOrThrow(targetObject, "id");
             }
         }
     }
 
 
-    public static Object tryGetObject(Object targetObject, String keyName) {
+    public static Object getFieldOrThrow(Object targetObject, String keyName) {
+        if (targetObject == null || keyName == null || keyName.isEmpty()) {
+            return null;
+        }
+
+        var targetClass = targetObject.getClass();
+        var fieldValue = tryGetField(targetObject, keyName);
+        if (fieldValue == null) {
+            throw new RuntimeException("No field or accessible getter found for key: " + keyName + " in class: " + targetClass.getName());
+        }
+
+        return fieldValue;
+    }
+
+    public static Object tryGetField(Object targetObject, String keyName) {
         if (targetObject == null || keyName == null || keyName.isEmpty()) {
             return null;
         }
@@ -139,18 +150,19 @@ public class GeneralUtils {
             field.setAccessible(true);
             return field.get(targetObject);
         } catch (NoSuchFieldException | IllegalAccessException e) {
-            String[] methodPrefixes = {"get", "is", "has"};
-            for (String prefix : methodPrefixes) {
+            String[] prefixes = {"", "get", "is", "fetch", "has"};
+            for (String prefix : prefixes) {
                 try {
                     var method = targetClass.getMethod(prefix + capitalizedKeyName);
                     return method.invoke(targetObject);
-                } catch (NoSuchMethodException | IllegalAccessException ignored) {
+                } catch (NoSuchMethodException | IllegalAccessException ignore) {
                 } catch (InvocationTargetException ex) {
                     throw new RuntimeException("Failed to access method " + prefix + capitalizedKeyName, ex);
                 }
             }
         }
-        throw new RuntimeException("No field or accessible getter found for key: " + keyName + " in class: " + targetClass.getName());
+        return null;
     }
+
 
 }

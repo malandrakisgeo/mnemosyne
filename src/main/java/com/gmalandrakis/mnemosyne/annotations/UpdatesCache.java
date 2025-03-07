@@ -70,52 +70,64 @@ public @interface UpdatesCache {
      */
     String[] keyOrder() default "";
 
-    /**
-     * Determines whether the purpose is to remove values from the cache or not, and how. See RemoveNode's documentation for details.
-     * You can limit its use by setting one or more conditions on conditionalDelete()
-     */
+
     RemoveMode removeMode() default RemoveMode.NONE;
+
+
+    AddMode addMode() default AddMode.NONE;
 
     /**
      * Refers to one or more boolean values that have to be true before adding something new to the cache.
      * These values are either annotated as @UpdateKey with the given name, or are present as fields in the
      * target object (i.e. the object annotated with @UpdatedValue or returned from the function, if an @UpdatedValue is absent).
      * <p>
-     * Multiple booleans result to a logical AND. If the keys cannot be cast to boolean, an exception is thrown.
+     * The keys are be default used in an AND gate. You may set conditionalANDGate to false if you prefer an OR.
+     * <p>
+     * If the keys cannot be cast to boolean, an exception is thrown.
+     * <p>
+     * If the result of the conditionalAdd operation clashes with the one for the conditionalDelete, an exception is thrown.
      * <p>
      * Booleans we want to be negative must start with an exclamation mark ('!').
      * <p>
      * Example:
      * <pre>
      *       {@code
-     *       @UpdatesCache(name="getActiveUsers", conditionalAdd={"isActivated"}, conditionalRemove={"!isActivated"})
-     *       public User saveUserDetails( String email, @UpdateKey(name="isActivated") boolean isActivated)
-     *
+     *       @UpdatesCache(name="getActiveUsers", conditionalAdd={"isActivated", "isVerified"}, conditionalRemove={"!isActivated"})
+     *       public void saveUserDetails(@UpdatedValue User newUser)
      *       }
      *       </pre>
      */
     String[] conditionalAdd() default "";
 
-    String[] conditionalDelete() default "";
+    /**
+     * Similar to conditionalAdd.
+     */
+    String[] conditionalRemove() default "";
+
+    /**
+     * If set to true, all conditions in the conditionalAdd and conditionalRemove have to be true in order for the new element to be added/removed.
+     * Otherwise one suffices.
+     */
+    boolean conditionalANDGate() default true;
 
 
     enum RemoveMode {
         /**
-         * No removals (default)
+         * No removals
          */
         NONE,
         /**
-         * Removes a key from the cache.
+         * Removes a key from the cache (or invalidates a cache if it corresponds to a function with no arguments).
          * In the default mnemosyne cache algorithms, this means that the keys are deleted, and the number of uses for associated IDs
          * is decreased. If it is zero, the ValuePool is informed that a cache no longer uses one or more IDs at all.
          * It is then up to the valuePool to decide whether the IDs and respective objects are kept or removed from it too.
          */
-        REMOVE_KEY,
+        DEFAULT,
         /**
          * Removes a particular ID from one collection only. A key is necessary for this to happen.
          * May only be used with caches that return a collection, otherwise ignored.
          */
-        REMOVE_VALUE_FROM_SINGLE_COLLECTION,
+        REMOVE_VALUE_FROM_COLLECTION,
         /**
          * Removes a particular ID from all available collections.
          * No key is necessary for this operation, and the ID is enough.
@@ -127,6 +139,36 @@ public @interface UpdatesCache {
          * Invalidates cache completely.
          */
         INVALIDATE_CACHE
+    }
+
+    enum AddMode {
+        /**
+         * No additions.
+         */
+        NONE,
+        /**
+         * For single key caches.
+         * If a value is updated, the previous key now references the newest object.
+         */
+        DEFAULT,
+        /**
+         * For collection caches.
+         * The new or updated values are added to the collection. A proper remove mode is needed to remove the outdated ones, if that is necessary.
+         * A key is necessary, except for functions that take no arguments.
+         */
+        ADD_VALUES_TO_COLLECTION,
+        /**
+         * For (non-special handling) collection caches. Adds a particular ID to all available collections.
+         * The new or updated values are added to all cached collections. A proper remove mode is needed to remove the outdated ones, if that is necessary.
+         * No key is necessary, as the values are added to all collections.
+         */
+        ADD_VALUES_TO_ALL_COLLECTIONS,
+        /**
+         * For collection caches.
+         * A key is necessary, and any existing collection for this key is removed to be replaced by another collection.
+         * Logically equivalent a DEFAULT removal mode combined with ADD_VALUES_TO_COLLECTION
+         */
+        REPLACE_EXISTING_COLLECTION //key necessary
     }
 
 }

@@ -26,7 +26,7 @@ public class SpringInterceptor implements MethodInterceptor {
         var targetObject = methodInvocation.getThis();
 
         if (method.getAnnotation(Cached.class) != null) {
-            return mnemoService.fetchFromCacheOrInvokeMethodAndUpdate(method, targetObject, args);
+            return mnemoService.fetchFromCacheOrInvokeMethodAndUpdate(method, args);
         } else {
             return mnemoService.invokeMethodAndUpdate(method, targetObject, args);
         }

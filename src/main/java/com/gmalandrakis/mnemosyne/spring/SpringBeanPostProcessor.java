@@ -12,9 +12,9 @@ public class SpringBeanPostProcessor implements InstantiationAwareBeanPostProces
     }
 
     @Override
-    public Object postProcessBeforeInstantiation(Class<?> bean, String beanName) {
-        mnemoService.generateCachesForClass(bean);
-        mnemoService.generateUpdatesForClass(bean);
-        return null;
+    public boolean postProcessAfterInstantiation(Object bean, String beanName) {
+        mnemoService.generateCachesForBean(bean);
+        mnemoService.generateUpdatesForBean(bean);
+        return true;
     }
 }

@@ -2,11 +2,13 @@ package com.gmalandrakis.mnemosyne.core;
 
 import com.gmalandrakis.mnemosyne.annotations.Cached;
 import com.gmalandrakis.mnemosyne.annotations.UpdatesCache;
+import com.gmalandrakis.mnemosyne.annotations.UpdatesCache.AddMode;
+import com.gmalandrakis.mnemosyne.annotations.UpdatesCache.RemoveMode;
+
 import com.gmalandrakis.mnemosyne.annotations.UpdateKey;
 import com.gmalandrakis.mnemosyne.annotations.UpdatedValue;
 import org.junit.Test;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -21,10 +23,10 @@ public class MnemoServiceUpdateTest {
         var updater = innerUpdateClass.class.getDeclaredMethod("updateTest9", innerUpdateClass.Customer.class);
         var test9 = innerUpdateClass.class.getDeclaredMethod("test9", String.class); //getByAgeAndActivated
         var getByAgeAndActivated = innerUpdateClass.class.getDeclaredMethod("getByAgeAndActivated", int.class, boolean.class);
-        mnemoService.generateForMethod(updater);
+        mnemoService.generateForMethod(updater, innerClass);
 
-        var test9Proxy = mnemoService.generateForMethod(test9);
-        var getByAgeAndActivatedProxy = mnemoService.generateForMethod(getByAgeAndActivated);
+        var test9Proxy = mnemoService.generateForMethod(test9, innerClass);
+        var getByAgeAndActivatedProxy = mnemoService.generateForMethod(getByAgeAndActivated, innerClass);
 
         var cust = new innerUpdateClass.Customer();
         cust.setName("test success!");
@@ -45,46 +47,46 @@ public class MnemoServiceUpdateTest {
 
     }
 
-      class innerUpdateClass {
+    class innerUpdateClass {
 
-         static class Customer {
-             private  String name;
-             private  String id;
-             private Integer age;
-             boolean accountActivated;
+        static class Customer {
+            private String name;
+            private String id;
+            private Integer age;
+            boolean accountActivated;
 
-             public String getName() {
-                 return name;
-             }
+            public String getName() {
+                return name;
+            }
 
-             public void setName(String name) {
-                 this.name = name;
-             }
+            public void setName(String name) {
+                this.name = name;
+            }
 
-             public String getId() {
-                 return id;
-             }
+            public String getId() {
+                return id;
+            }
 
-             public void setId(String id) {
-                 this.id = id;
-             }
+            public void setId(String id) {
+                this.id = id;
+            }
 
-             public Integer getAge() {
-                 return age;
-             }
+            public Integer getAge() {
+                return age;
+            }
 
-             public void setAge(Integer age) {
-                 this.age = age;
-             }
+            public void setAge(Integer age) {
+                this.age = age;
+            }
 
-             public boolean isAccountActivated() {
-                 return accountActivated;
-             }
+            public boolean isAccountActivated() {
+                return accountActivated;
+            }
 
-             public void setAccountActivated(boolean accountActivated) {
-                 this.accountActivated = accountActivated;
-             }
-         }
+            public void setAccountActivated(boolean accountActivated) {
+                this.accountActivated = accountActivated;
+            }
+        }
 
         /*
             1. Add special handling for multiple updates and single update
@@ -111,14 +113,14 @@ public class MnemoServiceUpdateTest {
 
         //   @UpdateCache(name = "getByAgeActivatedOnly", targetObjectKeys = {"age"}, conditionalAdd = "activated", conditionalDelete = "!activated")
         //   @UpdateCache(name = "getByAgeAndActivated", targetObjectKeys = {"age", "accountActivated"})
-        @UpdatesCache(name = "getByAgeAndActivated", targetObjectKeys = {"age", "accountActivated"})
-        @UpdatesCache(name = "test9", targetObjectKeys = "id")
+        @UpdatesCache(name = "getByAgeAndActivated", targetObjectKeys = {"age", "accountActivated"}, addMode = AddMode.DEFAULT, removeMode = RemoveMode.NONE)
+        @UpdatesCache(name = "test9", targetObjectKeys = "id", addMode = AddMode.DEFAULT, removeMode = RemoveMode.NONE)
         public String updateTest9(@UpdatedValue Customer i) {
             return i.getName();
         }
 
 
-        @UpdatesCache(name = "test9", annotatedKeys = "testKey")
+        @UpdatesCache(name = "test9", annotatedKeys = "testKey", addMode = AddMode.DEFAULT, removeMode = RemoveMode.NONE)
         @Cached(cacheName = "testUpdate")
         public String update9Test2(@UpdateKey(keyId = "testKey") Integer i) {
             if (i == 1) {
@@ -129,18 +131,19 @@ public class MnemoServiceUpdateTest {
 
 
         @Cached(cacheName = "test10", countdownFromCreation = true)
-        public List<String> test10(Integer i) {
+        public List<Customer> test10(List<String> ids) {
+            var cust1 = new Customer();
+            cust1.setId("id1");
+            var cust2 = new Customer();
+            cust2.setId("id2");
+            return List.of(cust1, cust2);
 
-            if (i % 2 == 0) {
-                return Collections.singletonList("Yey!");
-            }
-            return Collections.singletonList("Yoy");
         }
 
-        @UpdatesCache(name = "test10", annotatedKeys = "testKey")
-        public List<String> test10Updater(@UpdatedValue List<String> str, @UpdateKey(keyId = "testKey") Integer i) {
-            return null;
+        @UpdatesCache(name = "test10", targetObjectKeys = "id", addMode = AddMode.ADD_VALUES_TO_COLLECTION, removeMode = RemoveMode.NONE)
+        public void saveCustomer(@UpdatedValue Customer newcustomer) {
         }
+
 
     }
 }

@@ -5,6 +5,7 @@ import com.gmalandrakis.mnemosyne.cache.AbstractGenericCache;
 import com.gmalandrakis.mnemosyne.exception.MnemosyneInitializationException;
 import com.gmalandrakis.mnemosyne.exception.MnemosyneRuntimeException;
 import com.gmalandrakis.mnemosyne.structures.CollectionIdWrapper;
+import com.google.common.collect.Lists;
 import org.junit.Test;
 import org.mockito.Mockito;
 
@@ -30,13 +31,15 @@ public class MnemoServiceTest {
         var handlesCollections = Collection.class.isAssignableFrom(innerClass.class.getDeclaredMethod("test6", Collection.class).getReturnType());
 
         assert (handlesCollections);
-        var mnemoproxy1 = mnemoService.generateForMethod(innerClass.class.getDeclaredMethod("test1"));
-        var mnemoproxy2 = mnemoService.generateForMethod(innerClass.class.getDeclaredMethod("test2"));
-        var mnemoproxy3 = mnemoService.generateForMethod(innerClass.class.getDeclaredMethod("test3"));
-        var mnemoproxy4 = mnemoService.generateForMethod(innerClass.class.getDeclaredMethod("test4"));
-        var mnemoproxy8 = mnemoService.generateForMethod(innerClass.class.getDeclaredMethod("test8", Collection.class));
-        var mnemoproxy9 = mnemoService.generateForMethod(innerClass.class.getDeclaredMethod("test9", Integer.class));
-        var mnemoproxy10 = mnemoService.generateForMethod(innerClass.class.getDeclaredMethod("test10", Integer.class));
+        var instance = new innerClass();
+
+        var mnemoproxy1 = mnemoService.generateForMethod(innerClass.class.getDeclaredMethod("test1"), instance);
+        var mnemoproxy2 = mnemoService.generateForMethod(innerClass.class.getDeclaredMethod("test2"), instance);
+        var mnemoproxy3 = mnemoService.generateForMethod(innerClass.class.getDeclaredMethod("test3"), instance);
+        var mnemoproxy4 = mnemoService.generateForMethod(innerClass.class.getDeclaredMethod("test4"), instance);
+        var mnemoproxy8 = mnemoService.generateForMethod(innerClass.class.getDeclaredMethod("test8", Collection.class), instance);
+        var mnemoproxy9 = mnemoService.generateForMethod(innerClass.class.getDeclaredMethod("test9", Integer.class), instance);
+        var mnemoproxy10 = mnemoService.generateForMethod(innerClass.class.getDeclaredMethod("test10", Integer.class), instance);
 
         assert (mnemoproxy1.getValuePool() == mnemoproxy2.getValuePool());
         assert (mnemoproxy1.getValuePool().hashCode() == mnemoproxy2.getValuePool().hashCode());
@@ -46,14 +49,13 @@ public class MnemoServiceTest {
         assert (mnemoproxy9.getValuePool() != mnemoproxy2.getValuePool());
         assert (mnemoproxy9.getValuePool() == mnemoproxy10.getValuePool());
 
-        var instance = new innerClass();
-        var mnemoproxy11 = mnemoService.generateForMethod(innerClass.class.getDeclaredMethod("test11", List.class));
+        var mnemoproxy11 = mnemoService.generateForMethod(innerClass.class.getDeclaredMethod("test11", List.class), instance);
 
         var millis = System.currentTimeMillis();
 
         for (int i = 0; i < 1000; i++) {
             var integersToI = this.getIntegersTo(i);
-            var result = (List) mnemoService.fetchFromCacheOrInvokeMethodAndUpdate(innerClass.class.getDeclaredMethod("test11", List.class), instance, integersToI);
+            var result = (List) mnemoService.fetchFromCacheOrInvokeMethodAndUpdate(innerClass.class.getDeclaredMethod("test11", List.class),  integersToI);
             //var result = (List) mnemoproxy11.fetchFromCacheOrInvokeMethod(instance, integersToI);
             assert (result.size() == integersToI.size());
         }
@@ -75,7 +77,7 @@ public class MnemoServiceTest {
         var spyInnerClass = Mockito.spy(innerClass);
         var spyMnemo = Mockito.spy(mnemo);
         var test10 = innerClass.class.getDeclaredMethod("test10", Integer.class);
-        var proxy10 = Mockito.spy(spyMnemo.generateForMethod(test10));
+        var proxy10 = Mockito.spy(spyMnemo.generateForMethod(test10, innerClass));
 
         var field = spyMnemo.getClass().getDeclaredField("proxies");
         field.setAccessible(true); // !!!
@@ -88,12 +90,12 @@ public class MnemoServiceTest {
         var proxies = (ConcurrentHashMap) field.get(spyMnemo);
         proxies.put(test10, proxy10);
 
-        spyMnemo.fetchFromCacheOrInvokeMethodAndUpdate(test10, spyInnerClass, 1);
-        verify(proxy10, times(1)).getFromUnderlyingMethodAndUpdateMainCache(any(), any());
+        spyMnemo.fetchFromCacheOrInvokeMethodAndUpdate(test10,  1);
+        verify(proxy10, times(1)).getFromUnderlyingMethodAndUpdateMainCache(any());
         verify(proxy10, times(1)).getFromCache(any());
 
-        spyMnemo.fetchFromCacheOrInvokeMethodAndUpdate(test10, spyInnerClass, 1);
-        verify(proxy10, times(1)).getFromUnderlyingMethodAndUpdateMainCache(any(), any()); //It was called on the previous try! TODO: Find a way to nullify without resetting
+        spyMnemo.fetchFromCacheOrInvokeMethodAndUpdate(test10,  1);
+        verify(proxy10, times(1)).getFromUnderlyingMethodAndUpdateMainCache(any()); //It was called on the previous try! TODO: Find a way to nullify without resetting
         verify(proxy10, times(2)).getFromCache(any());
 
 
@@ -109,8 +111,8 @@ public class MnemoServiceTest {
         Thread.sleep(500);
         assert (valuePool.getSize() == 0);
 
-        spyMnemo.fetchFromCacheOrInvokeMethodAndUpdate(test10, spyInnerClass, 1);
-        verify(proxy10, times(2)).getFromUnderlyingMethodAndUpdateMainCache(any(), any());
+        spyMnemo.fetchFromCacheOrInvokeMethodAndUpdate(test10,  1);
+        verify(proxy10, times(2)).getFromUnderlyingMethodAndUpdateMainCache(any());
         verify(proxy10, times(3)).getFromCache(any());
 
     }
@@ -118,17 +120,17 @@ public class MnemoServiceTest {
     @Test
     public void assertThrows_runtime_concreteSepareteCollection() throws NoSuchMethodException {
         MnemoService mnemoService = new MnemoService();
-
+        var instance = new innerClass();
         var impossibleReturnTypeForSeparate = innerClass.class.getDeclaredMethod("test6", Collection.class);
         var acceptableTypes = innerClass.class.getDeclaredMethod("test12", List.class, int.class);
         var impossibleKeyForSeparate = innerClass.class.getDeclaredMethod("test13", List.class, int.class);
 
         assertThrows(MnemosyneInitializationException.class, () -> {
-            mnemoService.generateForMethod(impossibleReturnTypeForSeparate);
+            mnemoService.generateForMethod(impossibleReturnTypeForSeparate, instance);
         });
-        mnemoService.generateForMethod(acceptableTypes); //should not throw
+        mnemoService.generateForMethod(acceptableTypes, instance); //should not throw
         assertThrows(MnemosyneRuntimeException.class, () -> {
-            mnemoService.generateForMethod(impossibleKeyForSeparate);
+            mnemoService.generateForMethod(impossibleKeyForSeparate, instance);
         });
 
     }
@@ -140,11 +142,12 @@ public class MnemoServiceTest {
         boolean success = false;
         var method4 = innerClass.class.getDeclaredMethod("test4");
         var method7 = innerClass.class.getDeclaredMethod("test7");
+        var instance = new innerClass();
 
         try {
-            mnemoService.generateForMethod(method4);
+            mnemoService.generateForMethod(method4, instance);
 
-            mnemoService.generateForMethod(method7);
+            mnemoService.generateForMethod(method7, instance);
 
         } catch (RuntimeException e) {
             //success!
@@ -153,6 +156,30 @@ public class MnemoServiceTest {
         }
 
         assert (success);
+    }
+
+    @Test
+    public void testPreemptiveUpdate() throws Exception {
+        MnemoService mnemoService = new MnemoService();
+        var function = innerClass.class.getDeclaredMethod("functionForPreemptiveUpdateTest", Integer.class);
+        var updater1 = innerClass.class.getDeclaredMethod("testpreemptiveUpdateWithList", List.class, Integer.class);
+        var updater2 = innerClass.class.getDeclaredMethod("testpreemptiveUpdate", String.class, Integer.class);
+        var instance = new innerClass();
+        var meth = mnemoService.generateForMethod(function, instance);
+        mnemoService.generateUpdatesForBean(instance);
+        mnemoService.invokeMethodAndUpdate(updater2, instance, "extra string", 1);
+
+
+        List<String> result = (List<String>) mnemoService.fetchFromCacheOrInvokeMethodAndUpdate(function, 1);
+
+        assert (result.size() == 4);
+        assert (result.contains("extra string"));
+
+        mnemoService.invokeMethodAndUpdate(updater1, instance, List.of("val3"), 2);
+         result = (List<String>) mnemoService.fetchFromCacheOrInvokeMethodAndUpdate(function, 2);
+
+        assert (result.size() == 4);
+        assert (result.contains("val3"));
     }
 
 
@@ -214,7 +241,7 @@ public class MnemoServiceTest {
             return null;
         }
 
-        @UpdatesCache(name = "test9", annotatedKeys = "testKey")
+        @UpdatesCache(name = "test9", annotatedKeys = "testKey", removeMode = UpdatesCache.RemoveMode.REMOVE_VALUE_FROM_COLLECTION, addMode = UpdatesCache.AddMode.NONE)
         @Cached(cacheName = "testUpdate")
         public String updateTest9(@UpdateKey(keyId = "testKey") Integer i) {
             if (i == 1) {
@@ -233,9 +260,17 @@ public class MnemoServiceTest {
             return Collections.singletonList("Yoy");
         }
 
-        @UpdatesCache(name = "test10", annotatedKeys = "testKey")
-        public List<String> test10Updater(@UpdatedValue List<String> str, @UpdateKey(keyId = "testKey") Integer i) {
-            return null;
+        @Cached(cacheName = "testPreemptiveUpdate", countdownFromCreation = true)
+        public List<String> functionForPreemptiveUpdateTest(Integer i) {
+            return List.of("val1", "val2", String.valueOf(i));
+        }
+
+        @UpdatesCache(name = "testPreemptiveUpdate", annotatedKeys = "testKey", addMode = UpdatesCache.AddMode.DEFAULT, removeMode = UpdatesCache.RemoveMode.NONE)
+        public void testpreemptiveUpdateWithList(@UpdatedValue List<String> str, @UpdateKey(keyId = "testKey") Integer i) {
+        }
+
+        @UpdatesCache(name = "testPreemptiveUpdate", annotatedKeys = "testKey", addMode = UpdatesCache.AddMode.ADD_VALUES_TO_COLLECTION, removeMode = UpdatesCache.RemoveMode.NONE)
+        public void testpreemptiveUpdate(@UpdatedValue String str, @UpdateKey(keyId = "testKey") Integer i) {
         }
 
         @Cached(cacheName = "separateHandlingToBeTested", capacity = 500, allowSeparateHandlingForKeyCollections = true, threadPoolSize = 5)

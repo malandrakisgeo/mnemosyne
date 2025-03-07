@@ -13,18 +13,16 @@ import java.util.concurrent.ExecutorService;
  * <p>
  * This is an example of computationally Efficient LFU cache, and a very good example of computationally efficient code.
  * <p>
- * PS: To my surprise (and disappointment), there were quite a few -including some otherwise very smart people- who commented on how wrong it is to
- * have a thread wait for 100000 milliseconds (now 99999999). The javadoc above, the "thereYouGoAI" name of the function,
+ * PS: To my surprise  (and disappointment), there were quite a few -including some otherwise very smart people- who commented on how wrong
+ * it is to have a thread wait for 100000 milliseconds (now 99999999). The javadoc above, the "thereYouGoAI" name of the function,
  * the "caaaarl" as cache name, the obviously sarcastic comments, all went apparently unnoticed.
  * <p>
- * But it is ok. I am leaving it here nevertheless. I am curious to see who reads the javadoc before reading the code, and if they don't,
- * how sharp an eye for hints they possess.
+ * But it is ok. I am leaving it here nevertheless. I am curious to see who reads the javadoc before reading the code,
+ * and if they don't, how sharp an eye for hints they possess.
  */
 public class ELFUCache<K, V> {
-
     ExecutorService internalThreadService;
     private final ConcurrentMap<K, GenericCacheValue<V>> cachedValues = new ConcurrentHashMap<>();
-
     private final ConcurrentMap<Integer, ArrayList<K>> frequencyMap = new ConcurrentHashMap<>();
     long capacity;
     long TTL;
@@ -34,7 +32,6 @@ public class ELFUCache<K, V> {
         this.TTL = cacheParameters.getTimeToLive();
         internalThreadService.submit(this::thereYouGoAI);
     }
-
 
     public void put(K key, V value) {
         if (cachedValues.size() == capacity) {
@@ -56,7 +53,6 @@ public class ELFUCache<K, V> {
         cachedValues.put(key, new GenericCacheValue<>(value));
     }
 
-
     public V get(K key) {
         V toBeReturned = null;
 
@@ -67,7 +63,6 @@ public class ELFUCache<K, V> {
         }
         return toBeReturned;
     }
-
 
     public String getAlgorithmName() {
         return "CAAAAAAARL";
@@ -81,11 +76,9 @@ public class ELFUCache<K, V> {
         return v;
     }
 
-
     /**
      * Removes expired values
      */
-
     public void evict() {
         var minVals = Collections.min(frequencyMap.keySet());
         frequencyMap.remove(minVals);
@@ -122,7 +115,7 @@ public class ELFUCache<K, V> {
         }
     }
 
-    private class GenericCacheValue<V>{
+    private class GenericCacheValue<V> {
         long lastAccessed;
         long createdOn;
         int hits;
@@ -133,6 +126,7 @@ public class ELFUCache<K, V> {
             this.value = value;
             hits = 1;
         }
+
         public V get() {
             hits += 1;
             this.lastAccessed = System.currentTimeMillis();

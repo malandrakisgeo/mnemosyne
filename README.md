@@ -1,4 +1,4 @@
-### The project is under development and testing as of 1/2025.
+### The project is under development and testing as of 3/2025.
 
 # Mnemosyne
 Mnemosyne is a small and customizable cache library for Java applications.
@@ -78,7 +78,6 @@ Solving these problems is both logically and technically challenging.
 
 Some of them are solved. Others are current TODOs.
 Most led or lead to other challenges.
-And of course there is room for improvements in the existing code.
 
 You are welcome to join our journey towards an even smarter cache!
 
@@ -101,10 +100,15 @@ Feedback with results for other versions of Java or Spring, or even other JVM la
 (Coming soon)
 
 # Use instructions & examples
+
+### General
 Once the library is configured for the project, the first thing you need to do is to define the IDs of the objects to be cached.
-If the objects to be cached have an accessible  (i.e. either public or with a getter following Java naming conventions) field named Id (or ID, or id, or even iD), you don't need to do anything extra.
+If the objects to be cached have an accessible  (i.e. either public or with a getter following Java naming conventions) field named Id (or ID, or id, or even iD), 
+you don't need to do anything extra.
 If it doesn't, or if you want to use another field as an ID, all you need to do is to annotate the related field(s) as @Id.
 Multiple fields annotated with @Id form a compound Id.
+
+You can then create a cache by just using an annotation on any Singleton object.
 
 The caches can then be created with annotations above
 the methods to be cached, as you see in the examples below:
@@ -115,7 +119,7 @@ the methods to be cached, as you see in the examples below:
     @Cached(cacheName = "customerCache2", capacity = 500)
     public Customer doSomethingAndReturnACustomer(@Key String id, String irrelevantForCaching, Boolean irrelevantBoolean) ;
 
-    @Cached(cacheName = "getTransactionsByIds", capacity = 1000, allowSeparateHandlingForKeyCollections = true)
+    @Cached(cacheName = "getTransactionsByIds", capacity = 10000, allowSeparateHandlingForKeyCollections = true)
     List<Transaction> getTransactionByIds(Set<UUID> transactionIds);
 
     @Cached(cacheName = "getPendingTransactions")
@@ -124,26 +128,63 @@ the methods to be cached, as you see in the examples below:
     @Cached(cacheName = "completedTransactionCache", capacity = 1000)
     public List<Transaction> getTransactionsByUser(String userId, boolean completed);
  
-    @UpdatesCache(name="getTransactionById", targetObjectKeys={"id"})
-    @UpdatesCache(name="getTransactionsByIds", targetObjectKeys={"id"})
-    @UpdatesCache(name="completedTransactionCache", targetObjectKeys={"userId", "isCompleted"}, conditionalAdd="isCompleted", conditionalRemove="!isCompleted")
-    @UpdatesCache(name="getPendingTransactions", conditionalRemove="!transaction.isCompleted")
+    @UpdatesCache(name="getTransactionById", targetObjectKeys={"id"}, addMode = AddMode.DEFAULT)
+    @UpdatesCache(name="getTransactionByIds", targetObjectKeys={"id"}, addMode = AddMode.ADD_VALUES_TO_COLLECTION)
+    @UpdatesCache(name="completedTransactionCache", targetObjectKeys={"userId", "isCompleted"}, addMode = AddMode.ADD_VALUES_TO_COLLECTION, conditionalAdd="isCompleted", 
+    removeMode = RemoveMode.REMOVE_VALUE_FROM_COLLECTION, conditionalRemove="!isCompleted")
+    @UpdatesCache(name="getPendingTransactions", removeMode = RemoveMode.REMOVE_VALUE_FROM_COLLECTION, conditionalRemove="!transaction.isCompleted")
+    @UpdatesCache(name="getPendingTransactionsByUser", removeMode = RemoveMode.REMOVE_VALUE_FROM_COLLECTION, addMode = AddMode.ADD_VALUES_TO_COLLECTION, 
+    conditionalRemove="!transaction.isCompleted", conditionalAdd="transaction.isCompleted", targetObjectKeys="userId")
     public void saveTransaction(@UpdatedValue Transaction transaction);
 
 
-Unless otherwise indicated by the presence of a @com.gmalandrakis.mnemosyne.annotations.Key annotation, all arguments are assembled to a CompoundKey used to retrieve the actual cache values.
+Unless otherwise indicated by the presence of a @com.gmalandrakis.mnemosyne.annotations.Key annotation, all arguments are assembled to a 
+CompoundKey used to retrieve the actual cache values. 
 
-### Limitations
-As of 1/2025, mnemosyne's default caching algorithms do not work properly with proxy objects.
+### Limitations & Precautions
 
-Many frameworks and libraries for databases and REST- or SOAP- services, wrap the returned values in proxy objects
-that often lack a particular ID. 
+#### Proxy objects
+As of 3/2025, mnemosyne's default caching algorithms may not work properly with proxy objects.
 
-There is a TODO on enabling support for enabling custom ID deduction, but
+Many frameworks and libraries for databases or REST- and SOAP-based services, wrap the returned values in proxy objects
+that often lack a particular ID. There is a TODO on enabling support for enabling custom ID deduction, but
 it currently is strongly recommended that object proxying is deactivated before mnemosyne is used.
 
 Deactivating proxy objects differs from framework to framework, (e.g. in Hibernate it can be done by annotating the entities with @Proxy(lazy=false) ). 
 Please check the documentation of the framework/library you use.
+
+#### Collections as keys
+As of 3/2025, methods that take a Collection as an argument will work properly only if they are an abstract Collection, Set, or List.
+Using a concrete subclass, like e.g. ArrayList or HashSet, is explicitly forbidden in case you want to use special collection handling and will result to a RuntimeException.
+
+When no special collection handling is enabled, though the use of e.g. ArrayLists is not forbidden, it may result to update discrepancies if another method updates the cached one via an @UpdatesCache annotation: the objects being updates via an @UpdatesCache annotation
+are only wrapped in abstract Set or Lists, which are different from HashSets and ArrayLists, and will result to different keys.
+
+In general, unless you have a 1-1 correlation between keys in a collection and returned values, or the collection is used as a whole (e.g. collection of XY coordinates), 
+it is not recommended to use collections as keys in cached methods, especially when they are updated via mnemosyne. 
+
+To understand why, consider the following use case: a method returning all the transactions by seller given a list of seller IDs. No 1-1 correlation can be assumed 
+(a seller is most likely associated with more than one transaction). Calling the method with the list with the values "seller1" and "seller2" 
+returns a different result than calling it with a "seller1", "seller3". If you cache this method, nothing particularly bad will happen: 
+mnemosyne will just fetch the data for "seller1" twice. 
+But if you proceed to updating the method via an @UpdatesCache annotation, as of 3/2025, you will get cache discrepancies.
+It would be more prudent to cache an underlying method that takes each sellerId one by one and yields a result, especially if you want to update the cache.
+
+    public List<Transaction> getTransactionsBySellersDoneRight(List<String> sellers){
+        return sellers.stream().map(this::getTransactionsBySellerId).flatMap(List::stream).collect(Collectors.toList());
+    }
+
+    @Cached(cacheName = "doneRight") 
+    public List<Transaction> getTransactionsBySeller(String sellerId) {
+        return repository.getTransactionBySellerId(sellerId);
+    }
+
+    @Cached(cacheName = "doneWrong") //Will definitely result to cache discrepancies when updating
+    public List<Transaction> getTransactionsBySellersDoneWrong(List<String> sellerIds) { //It would work perfectly with special handling enabled, but that requires a 1-1 correlation between sellerIds and Transactions.
+        return repository.getTransactionsBySellerIds(sellerIds);
+    }
+
+Overcoming these limitations is a TODO.
 
 
 ## Future plans
@@ -154,6 +195,7 @@ But this is nothing one person can achieve alone, so feel free to contribute!
 * Test, test, test, test.
 * Write more elaborate and cleaner documentation
 * Improve the exception handling
+* Overcome the limitations described earlier
 * Add support for LRU and S3-FIFO
 * Add better support for conditional update
 * Add easy configuration for non-Spring applications

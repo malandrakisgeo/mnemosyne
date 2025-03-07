@@ -14,9 +14,7 @@ import org.springframework.context.annotation.EnableAspectJAutoProxy;
 @EnableAspectJAutoProxy
 public class MnemosyneSpringConf {
     private final MnemoService mnemoService = new MnemoService();
-
     private final SpringInterceptor springInterceptor = new SpringInterceptor(mnemoService);
-
     @Bean
     public SpringBeanPostProcessor springBeanPostProcessor() {
         return new SpringBeanPostProcessor(mnemoService);

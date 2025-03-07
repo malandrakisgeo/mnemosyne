@@ -119,8 +119,8 @@ public @interface Cached {
     /**
      * Experimental and not for general use.
      * <p>
-     * If a Method uses a Collection, List, or Set of keys as argument, and returns a Collection, List,or Set
-     * of objects, setting this to true will enable special handling for it.
+     * If a Method with a 1-1 correspondence between keys and values uses a Collection, List, or Set of keys as argument,
+     * and returns a Collection, List,or Set of values as a result, setting this to true will enable special handling for it.
      * <p>
      * Whenever the Method is called with a Collection of keys, mnemo will:<br>
      * 1. Check which keys already exist in the cache<br>
@@ -138,5 +138,14 @@ public @interface Cached {
      * or returned plays any role (e.g. Collection of XY coordinates).
      */
     boolean allowSeparateHandlingForKeyCollections() default false;
+
+
+    /**
+     * Only taken into account for collection-caches that do not have separeteHandling enabled.
+     * If set to true, mnemosyne does some smarter handling both when fetching and when updating.
+     * The handling is rather similar to allowSeparateHandlingForKeyCollections, except no 1-1 correlation
+     * between keys and values is assumed, and the mapping steps are skipped
+     */
+    boolean keyIsIdCollection() default false;
 
 }

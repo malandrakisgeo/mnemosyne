@@ -23,13 +23,13 @@ public class CollectionIdWrapper<ID> extends IdWrapper<ID> {
         collection.addAll(id);
     }
 
-    public void addToCollectionOrUpdate(ID id) {
-        collection.add(id); //hits and timestamps are updated only when requesting the IDs.
+    public boolean addToCollectionOrUpdate(ID id) {
+        return collection.add(id); //hits and timestamps are updated only when requesting the IDs.
     }
 
     public Collection<ID> getIds() {
         hits += 1;
-        updateLastAccessed();
+        this.lastAccessed = System.currentTimeMillis();
         return collection;
     }
 }

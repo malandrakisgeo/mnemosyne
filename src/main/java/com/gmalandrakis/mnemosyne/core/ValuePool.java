@@ -64,7 +64,15 @@ public class ValuePool<ID, T> {
     }
 
     public int getSize() {
-        return this.valueMap.size();
+        return valueMap.size();
+    }
+
+    public int getNumberOfUsesForId(ID id) {
+        var val = valueMap.get(id);
+        if (val == null) {
+            return 0;
+        }
+        return val.getNumberOfUses();
     }
 
 }
