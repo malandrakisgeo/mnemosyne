@@ -13,9 +13,7 @@ import java.util.concurrent.Executors;
 
 public abstract class AbstractGenericCache<K, ID, V> extends AbstractMnemosyneCache<K, ID, V> {
     final ExecutorService internalThreadService;
-
     final ValuePool<ID, V> valuePool;
-
     final String name;
     final boolean countdownFromCreation;
     final long timeToLive;
@@ -125,30 +123,5 @@ public abstract class AbstractGenericCache<K, ID, V> extends AbstractMnemosyneCa
     public ExecutorService getInternalThreadService() {
         return internalThreadService;
     }
-
-    /**
-     * Puts the thread to sleep for a number of milliseconds, and suppresses the interrupts.
-     * This is only meant to be used by internal threads whose sole purpose is to do something periodically.
-     */
-   /* private void sleepUninterrupted(long sleepTime) {
-        boolean sleepComplete = false;
-        long sleepStarted = 0;
-        long remainingSleep;
-
-        remainingSleep = sleepTime;
-        while (!sleepComplete) {
-            try {
-                sleepStarted = System.currentTimeMillis();
-                Thread.sleep(remainingSleep);
-            } catch (InterruptedException e) {
-                //oops!
-            } finally {
-                remainingSleep = remainingSleep - (System.currentTimeMillis() - sleepStarted);
-            }
-            if (remainingSleep <= 0) {
-                sleepComplete = true;
-            }
-        }
-    }*/
 
 }

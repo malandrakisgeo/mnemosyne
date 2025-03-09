@@ -56,6 +56,7 @@ public class GeneralUtils {
 
     @SuppressWarnings("unchecked")
     public static CompoundKey deduceCompoundKeyFromMethodAndArgs(Method method, Object[] args) {
+        //TODO: Simplify so that whenever a method uses just a single argument of type Number, charSequence, or UUID as a key, no compoundKey is used.
         if (args == null || args.length == 0) {
             return new CompoundKey(new Object[0]); //handling for methods with no keys (e.g. returning the same list everytime)
         }

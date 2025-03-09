@@ -4,6 +4,7 @@ import com.gmalandrakis.mnemosyne.core.ValuePool;
 import com.gmalandrakis.mnemosyne.exception.MnemosyneRetrievalException;
 import com.gmalandrakis.mnemosyne.structures.CacheParameters;
 import com.gmalandrakis.mnemosyne.structures.CollectionIdWrapper;
+import com.gmalandrakis.mnemosyne.structures.IdWrapper;
 import com.gmalandrakis.mnemosyne.structures.SingleIdWrapper;
 
 import java.util.*;
@@ -47,14 +48,25 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {    //WI
 
         map.forEach(this::addOrUpdateIdAndValue);
 
-        recencyQueue.remove(key);
-        recencyQueue.add(key);
-
+        if (!recencyQueue.contains(key)) {
+            recencyQueue.add(key);
+        }
     }
 
     @Override
     public void putInAllCollections(ID id, T value) {
-
+        if (!returnsCollection || handleCollectionKeysSeparately) {
+            return;
+        }
+        var initialNumOfUses = numberOfUsesById.get(id);
+        int i = initialNumOfUses;
+        for (K k : keyIdMapper.keySet()) {
+            var c = ((CollectionIdWrapper) keyIdMapper.get(k));
+            if (c.addToCollectionOrUpdate(id)) {
+                numberOfUsesById.put(id, ++i);
+            }
+        }
+        valuePool.put(id, value, initialNumOfUses == 0);
     }
 
     @Override
@@ -84,8 +96,9 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {    //WI
 
         addOrUpdateIdAndValue(id, value);
 
-        recencyQueue.remove(key);
-        recencyQueue.add(key);
+        if (!recencyQueue.contains(key)) {
+            recencyQueue.add(key); //reminder that updates are not synonymous to accesses, and this is why we do not change the position in the queue on updating.
+        }
     }
 
     @Override
@@ -95,7 +108,8 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {    //WI
         }
         var cachedIdData = keyIdMapper.get(key);
         if (cachedIdData == null) {
-            throw new MnemosyneRetrievalException("Key is present in concurrent FIFO queue, buy not in keyIdMap: " + key.toString());
+            recencyQueue.remove(key);
+            throw new MnemosyneRetrievalException("Key is present in recency queue, buy not in keyIdMap: " + key.toString());
         }
         //TODO: If handleCollectionKeysSeparately, a cacheIdData with single Id should be used.
         ID id = (ID) (handleCollectionKeysSeparately ? ((CollectionIdWrapper) cachedIdData).getIds().toArray()[0] : ((SingleIdWrapper) cachedIdData).getId());
@@ -111,7 +125,8 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {    //WI
         }
         var id = (CollectionIdWrapper) keyIdMapper.get(key);
         if (id == null) {
-            throw new MnemosyneRetrievalException("Key is present in concurrent FIFO queue, buy not in keyIdMap: " + key.toString());
+            recencyQueue.remove(key);
+            throw new MnemosyneRetrievalException("Key is present in recency queue, buy not in keyIdMap: " + key.toString());
         }
         recencyQueue.remove(key);
         recencyQueue.add(key);
@@ -179,7 +194,23 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {    //WI
 
     @Override
     public void removeFromAllCollections(ID id) {
-
+        if (!returnsCollection) {
+            return;
+        }
+        var relatedKeys = new HashSet<K>();
+        for (K k : keyIdMapper.keySet()) {
+            var deleted = ((CollectionIdWrapper) keyIdMapper.get(k)).getIds().remove(id);
+            if (deleted) {
+                relatedKeys.add(k);
+                removeOrDecreaseIdUses(id);
+            }
+        }
+        if (handleCollectionKeysSeparately) { //on special collection handling, a key corresponds to at most one ID
+            relatedKeys.forEach(k -> {
+                keyIdMapper.remove(k);
+                recencyQueue.remove(k);
+            });
+        }
     }
 
     @Override

@@ -4,6 +4,7 @@ import com.gmalandrakis.mnemosyne.core.ValuePool;
 import com.gmalandrakis.mnemosyne.exception.MnemosyneRetrievalException;
 import com.gmalandrakis.mnemosyne.structures.CacheParameters;
 import com.gmalandrakis.mnemosyne.structures.CollectionIdWrapper;
+import com.gmalandrakis.mnemosyne.structures.IdWrapper;
 import com.gmalandrakis.mnemosyne.structures.SingleIdWrapper;
 
 import java.util.*;
@@ -104,8 +105,8 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
         var initialNumOfUses = numberOfUsesById.get(id);
         int i = initialNumOfUses;
         for (K k : keyIdMapper.keySet()) {
-            var c = ((CollectionIdWrapper) keyIdMapper.get(k));
-            if (c.addToCollectionOrUpdate(id)) {
+            var idWrapper = ((CollectionIdWrapper) keyIdMapper.get(k));
+            if (idWrapper.addToCollectionOrUpdate(id)) {
                 numberOfUsesById.put(id, ++i);
             }
         }
@@ -119,6 +120,7 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
         }
         var cachedIdData = keyIdMapper.get(key);
         if (cachedIdData == null) {
+            concurrentFIFOQueue.remove(key);
             throw new MnemosyneRetrievalException("Key is present in concurrent FIFO queue, buy not in keyIdMap: " + key.toString());
         }
         //TODO: Perhaps a cacheIdData with single Id could be used when handleCollectionKeysSeparately.
@@ -134,7 +136,8 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
         }
         var id = (CollectionIdWrapper) keyIdMapper.get(key);
         if (id == null) {
-            throw new MnemosyneRetrievalException("Key is present in concurrent FIFO queue, buy not in keyIdMap: " + key.toString());
+            concurrentFIFOQueue.remove(key);
+            throw new MnemosyneRetrievalException("Key was present in concurrent FIFO queue, buy not in keyIdMap: " + key.toString());
         }
         return valuePool.getAll(id.getIds());
     }
@@ -240,13 +243,13 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
             When we preemptively added values in collection-caches without filtering out the ones already fetched,
             we ended up with a memory leak: the IDs were removed from concurrentFIFOQueue but were still referenced to
             by numberOfUsesById. We keep it as it is to help us find other mistakes in a while.
-            TODO: Replace it manually after everything is tested thoroughtly.
+            TODO: Replace it manually after everything is tested thoroughly.
          */
         //numberOfUsesById = new ConcurrentHashMap<ID, Integer>();
     }
 
     @Override
-    boolean idUsedAlready(ID v) { //TODO: Delete this disgrace when coming up with something better
+    boolean idUsedAlready(ID v) {
         var numberOfCollectionsUsingIt = numberOfUsesById.get(v);
         return numberOfCollectionsUsingIt != null && numberOfCollectionsUsingIt > 0;
     }

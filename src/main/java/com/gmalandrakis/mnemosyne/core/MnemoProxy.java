@@ -5,7 +5,6 @@ import com.gmalandrakis.mnemosyne.annotations.UpdatesCache.AddMode;
 
 import com.gmalandrakis.mnemosyne.cache.AbstractGenericCache;
 import com.gmalandrakis.mnemosyne.cache.AbstractMnemosyneCache;
-import com.gmalandrakis.mnemosyne.exception.MnemosyneUpdateException;
 import com.gmalandrakis.mnemosyne.structures.CompoundKey;
 import com.gmalandrakis.mnemosyne.utils.GeneralUtils;
 import com.google.common.collect.Iterables;
@@ -41,7 +40,8 @@ public class MnemoProxy<K, ID, V> {
 
     private final ExecutorService executorService;
 
-    public MnemoProxy(AbstractMnemosyneCache<K, ID, V> cache, Method method, Object invocationTargetObject, ValuePool<ID, V> valuePool, boolean returnsCollections, boolean specialCollectionHandling) {
+    public MnemoProxy(AbstractMnemosyneCache<K, ID, V> cache, Method method, Object invocationTargetObject,
+                      ValuePool<ID, V> valuePool, boolean returnsCollections, boolean specialCollectionHandling) {
         this.cache = cache;
         this.cachedMethod = method;
         this.invocationTargetObject = invocationTargetObject;
@@ -83,17 +83,17 @@ public class MnemoProxy<K, ID, V> {
         }
     }
 
-    void updateByRemoving(K compoundKey, Map<ID, V> idValueMap, Boolean conditionalRemove, RemoveMode removeMode) {
+    void updateByRemoving(K key, Map<ID, V> idValueMap, Boolean conditionalRemove, RemoveMode removeMode) {
         if (removeMode != RemoveMode.NONE && (conditionalRemove == null || conditionalRemove)) {
 
-            if (compoundKey != null && removeMode.equals(RemoveMode.DEFAULT)) {
-                cache.remove(compoundKey);
+            if (key != null && removeMode.equals(RemoveMode.DEFAULT)) {
+                cache.remove(key);
                 return;
             }
 
             if (returnsCollections) {
                 if (removeMode.equals(RemoveMode.REMOVE_VALUE_FROM_COLLECTION)) {
-                    idValueMap.keySet().forEach(id -> cache.removeOneFromCollection(compoundKey, id));
+                    idValueMap.keySet().forEach(id -> cache.removeOneFromCollection(key, id));
                     return;
                 } else if (removeMode.equals(RemoveMode.REMOVE_VALUE_FROM_ALL_COLLECTIONS)) {
                     idValueMap.keySet().forEach(cache::removeFromAllCollections); //o prwtos pou tha mou steilei email gia auto to sxolio lamvanei pente evrw.
@@ -107,43 +107,39 @@ public class MnemoProxy<K, ID, V> {
         }
     }
 
-    /* TODO:  Unit test:
-        1. Create a service with one collection cache non-special handling.
-        It should return three values for a key A.
-        2. Create an updater-method of that function.
-        3. Call the updater method with the key A (add a fourth value)
-        4. Call then the collection-cache method with the key A, and verify
-        you get four values.
-     */
-    void updateByAdding(K compoundKey, Map<ID, V> idValueMap, Boolean conditionalAdd, AddMode addMode) {
+    void updateByAdding(K key, Map<ID, V> idValueMap, Boolean conditionalAdd, AddMode addMode) {
         if (addMode != AddMode.NONE && (conditionalAdd == null || conditionalAdd)) {
 
             if (addMode == AddMode.DEFAULT) {
-                cache.remove(compoundKey);
+                cache.remove(key);
                 if (returnsCollections) {
                     if (!specialCollectionHandlingEnabled) {
-                        preemptiveAdd(compoundKey, idValueMap.keySet()); //Crudely written. TODO: Improve or remove. Perhaps allow the user to decide if the preemptive add happens?
+                        preemptiveAdd(key, idValueMap.keySet()); //Crudely written. TODO: Improve or remove. Perhaps allow the user to decide if the preemptive add happens?
                     }
-                    cache.putAll(compoundKey, idValueMap);
+                    cache.putAll(key, idValueMap);
                 } else {
                     var singleKey = idValueMap.keySet().stream().toList().get(0);
-                    cache.put(compoundKey, singleKey, idValueMap.get(singleKey));
+                    cache.put(key, singleKey, idValueMap.get(singleKey));
                 }
             }
 
             if (addMode == AddMode.ADD_VALUES_TO_COLLECTION) {
                 if (returnsCollections) {
                     if (!specialCollectionHandlingEnabled) {
-                        preemptiveAdd(compoundKey, idValueMap.keySet());
+                        preemptiveAdd(key, idValueMap.keySet());
                     }
                 }
-                cache.putAll(compoundKey, idValueMap);
+                cache.putAll(key, idValueMap);
             }
 
             if (addMode == AddMode.ADD_VALUES_TO_ALL_COLLECTIONS) {
                 idValueMap.forEach(cache::putInAllCollections);
             }
 
+            if (addMode == AddMode.REPLACE_EXISTING_COLLECTION) {
+                cache.remove(key);
+                cache.putAll(key, idValueMap);
+            }
         }
     }
 
@@ -204,7 +200,7 @@ public class MnemoProxy<K, ID, V> {
         var keys = (Collection<K>) compoundKey.getKeyObjects()[0]; //In separate-handling collection-caches, the first compoundKey is not the key itself: it contains a Collection of the actual keys instead
         var compoundKeys = (Collection<K>) keys.stream().map(k -> GeneralUtils.deduceCompoundKeyFromMethodAndArgs(this.cachedMethod, new Object[]{k})).toList(); //we need therefore to wrap each key around a compoundKey, because that is what we do everywhere else, and it will otherwise lead to a bug: a CompoundKey(value) is never equal to (value)
         var resultCollection = cache.getAll(compoundKeys);
-        if (resultCollection == null || resultCollection.isEmpty() || resultCollection.contains(null) || resultCollection.size() < keys.size()) {
+        if (resultCollection == null || resultCollection.isEmpty() || resultCollection.size() < keys.size() || resultCollection.contains(null)) {
             return null; //We don't know which key did not have a cached value. So we return null, and do the separate handling afterwards.
         }
         return resultCollection;

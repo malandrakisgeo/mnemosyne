@@ -20,7 +20,6 @@ public class CompoundKey {
         this.keyObjects = keyObjects;
     }
 
-
     public Object[] getKeyObjects() {
         return keyObjects;
     }

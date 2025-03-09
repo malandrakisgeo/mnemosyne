@@ -40,6 +40,13 @@ public abstract class AbstractMnemosyneCache<K, ID, V> {
      */
     public abstract void putAll(K key, Map<ID, V> ídValueMap);
 
+    /**
+     * Adds a particular ID in all available collection caches independently of the keys corresponding to them.
+     * Should only be implemented for algorithms that may be used for caching collections.
+     *
+     * @param id
+     * @param value
+     */
     public abstract void putInAllCollections(ID id, V value);
 
     public abstract Collection<V> getAll(K key);
@@ -74,6 +81,11 @@ public abstract class AbstractMnemosyneCache<K, ID, V> {
      * @param id
      */
     public abstract void removeOneFromCollection(K key, ID id);
+
+    /**
+     * Removes an ID from all available entries of a collection cache independently of keys.
+     * @param id
+     */
 
     public abstract void removeFromAllCollections(ID id);
 

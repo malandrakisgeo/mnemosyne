@@ -1,8 +1,7 @@
 package com.gmalandrakis.mnemosyne.cache;
 
 import com.gmalandrakis.mnemosyne.core.ValuePool;
-import com.gmalandrakis.mnemosyne.structures.CacheParameters;
-import com.gmalandrakis.mnemosyne.structures.CacheValue;
+import com.gmalandrakis.mnemosyne.structures.*;
 import com.gmalandrakis.mnemosyne.utils.GeneralUtils;
 import org.junit.Before;
 import org.junit.Test;

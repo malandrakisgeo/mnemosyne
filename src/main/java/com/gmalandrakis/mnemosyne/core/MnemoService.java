@@ -381,7 +381,6 @@ public class MnemoService {
             List arrayList = new ArrayList();
 
             var linkedHashMaps = new LinkedHashMap[]{annotatedKeyNamesAndValues, targetKeyNamesAndValues};
-            //TODO: Bug to fix: this does not take into account separate handling collections. Pithanotata oute kai o parapanw kwdikas
             if (keyIsASet) {
                 for (LinkedHashMap linkedHashMap : linkedHashMaps) {
                     if (linkedHashMap != null) {

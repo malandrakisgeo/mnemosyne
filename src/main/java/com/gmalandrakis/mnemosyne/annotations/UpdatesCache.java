@@ -70,11 +70,17 @@ public @interface UpdatesCache {
      */
     String[] keyOrder() default "";
 
-
-    RemoveMode removeMode() default RemoveMode.NONE;
-
-
+    /**
+     * Determines how new values are added to the existing caches.
+     * Refer to {@link AddMode} for further details.
+     */
     AddMode addMode() default AddMode.NONE;
+
+    /**
+     * Determines how new values are removed from the existing caches.
+     * Refer to {@link RemoveMode} for further details.
+     */
+    RemoveMode removeMode() default RemoveMode.NONE;
 
     /**
      * Refers to one or more boolean values that have to be true before adding something new to the cache.
@@ -109,7 +115,6 @@ public @interface UpdatesCache {
      * Otherwise one suffices.
      */
     boolean conditionalANDGate() default true;
-
 
     enum RemoveMode {
         /**
@@ -147,20 +152,33 @@ public @interface UpdatesCache {
          */
         NONE,
         /**
-         * For single key caches.
+         * For single value caches.
+         * <p>
          * If a value is updated, the previous key now references the newest object.
+         * <p>
+         * If a (non special-handling) collection cache contains no values for the particular key (e.g. the underlying method has never been called before),
+         * the underlying method is called preemptively to avoid cache discrepancies.
          */
         DEFAULT,
         /**
          * For collection caches.
          * The new or updated values are added to the collection. A proper remove mode is needed to remove the outdated ones, if that is necessary.
-         * A key is necessary, except for functions that take no arguments.
+         * <p>
+         * A key is necessary for the operation, except for functions that take no arguments.
+         * <p>
+         * If a (non special-handling) cache contains no values for the particular key (e.g. the underlying method has never been called before),
+         * the underlying method is called preemptively to avoid cache discrepancies.
          */
         ADD_VALUES_TO_COLLECTION,
         /**
-         * For (non-special handling) collection caches. Adds a particular ID to all available collections.
-         * The new or updated values are added to all cached collections. A proper remove mode is needed to remove the outdated ones, if that is necessary.
-         * No key is necessary, as the values are added to all collections.
+         * For (non special-handling) collection caches. Adds a particular ID to all available collections in the cache.
+         * <p>
+         * The new or updated values are added to all cached collections and the value pool, and the current values remain unchanged.
+         * A proper remove mode is needed to remove the outdated ones, if that is necessary.
+         * <p>
+         * No key is necessary for the operation, as the values are added to all collections.
+         * <p>
+         * The current values are assumed to be up-to-date and complete, so no preemptive adding is done.
          */
         ADD_VALUES_TO_ALL_COLLECTIONS,
         /**

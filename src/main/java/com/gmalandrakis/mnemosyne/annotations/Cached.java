@@ -122,7 +122,7 @@ public @interface Cached {
      * If a Method with a 1-1 correspondence between keys and values uses a Collection, List, or Set of keys as argument,
      * and returns a Collection, List,or Set of values as a result, setting this to true will enable special handling for it.
      * <p>
-     * Whenever the Method is called with a Collection of keys, mnemo will:<br>
+     * Whenever the Method is called with a Collection of keys, Mnemosyne will:<br>
      * 1. Check which keys already exist in the cache<br>
      * 2. Asynchronously call the Method with every key that did not exist in the cache separately, and create a map of keys and values.<br>
      * 3. Store the result in the cache<br>
@@ -131,7 +131,7 @@ public @interface Cached {
      * return concrete implementations of the aforementioned, like ArrayList or HashSet), with a 1-1 correspondence
      * between keys and values.
      * <p>
-     * Setting to true can make your cache more effective in the long-term, but may make it considerably slower in the beginning.
+     * Setting to true can make your cache more effective in the long-term, but may make it slower in the beginning.
      * Should not be set to true if the underlying method calls a pay-per-request service.
      * Setting to true is not recommended unless absolutely necessary,
      * and <b>strongly discouraged</b> in cases where the length and/or element order of the collection used as argument

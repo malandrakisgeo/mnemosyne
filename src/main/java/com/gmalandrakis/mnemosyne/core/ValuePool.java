@@ -8,6 +8,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * A ValuePool of IDs and their corresponding values.
+ * A separate ValuePool is created by Mnemosyne for each object type cached, and is shared across all caches returning a type (or a Collection of it).
+ *
+ * @author George Malandrakis (malandrakisgeo@gmail.com)
+ */
 public class ValuePool<ID, T> {
 
     private final ConcurrentHashMap<ID, CacheValue<T>> valueMap = new ConcurrentHashMap<>();
@@ -38,10 +44,9 @@ public class ValuePool<ID, T> {
         else {
             cachedValue.updateValue(value);
             if (newCache) {
-                this.valueMap.get(id).increaseNumberOfUses();
+                cachedValue.increaseNumberOfUses();
             }
         }
-
     }
 
     public Map<ID, Integer> removeOrDecreaseNumberOfUsesForIds(Collection<ID> ids) {
@@ -73,6 +78,30 @@ public class ValuePool<ID, T> {
             return 0;
         }
         return val.getNumberOfUses();
+    }
+
+    public long getLastAccessed(ID id){
+        var val = valueMap.get(id);
+        if (val == null) {
+            return 0;
+        }
+        return val.getLastAccessed();
+    }
+
+    public int getHits(ID id){
+        var val = valueMap.get(id);
+        if (val == null) {
+            return 0;
+        }
+        return val.getHits();
+    }
+
+    public int getTotalOperations(ID id){
+        var val = valueMap.get(id);
+        if (val == null) {
+            return 0;
+        }
+        return val.getTotalOperations();
     }
 
 }
