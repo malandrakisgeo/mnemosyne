@@ -87,7 +87,7 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
                 }
                 removeOrDecreaseIdUses(oldId);
             }
-            keyIdMapper.put(key, new SingleIdWrapper<>(id)); //if we used putIfAbsent, we would prevent the key from being updated with a brand new ID/value
+            keyIdMapper.put(key, new SingleIdWrapper<ID>(id)); //if we used putIfAbsent, we would prevent the key from being updated with a brand new ID/value
         }
 
         addOrUpdateIdAndValue(id, value);
@@ -249,7 +249,7 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
     }
 
     @Override
-    boolean idUsedAlready(ID v) {
+    public boolean idUsedAlready(ID v) {
         var numberOfCollectionsUsingIt = numberOfUsesById.get(v);
         return numberOfCollectionsUsingIt != null && numberOfCollectionsUsingIt > 0;
     }

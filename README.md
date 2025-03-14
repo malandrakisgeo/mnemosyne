@@ -101,7 +101,7 @@ Feedback with results for other versions of Java or Spring, or even other JVM la
 
 # Use instructions & examples
 
-### General
+### General use
 Once the library is configured for the project, the first thing you need to do is to define the IDs of the objects to be cached.
 If the objects to be cached have an accessible  (i.e. either public or with a getter following Java naming conventions) field named Id (or ID, or id, or even iD), 
 you don't need to do anything extra.
@@ -140,6 +140,15 @@ the methods to be cached, as you see in the examples below:
 
 Unless otherwise indicated by the presence of a @com.gmalandrakis.mnemosyne.annotations.Key annotation, all arguments are assembled to a 
 CompoundKey used to retrieve the actual cache values. 
+
+### Implementing custom caching algorithms
+
+As of 3/2025 a generic implementation of a FIFO and an LRU are provided by mnemosyne. An S3-FIFO and an LFU are under construction.
+But since many projects have domain-specific needs and eviction policies, users are able to implement their own caching algorithms
+by extending the AbstractMnemosyneCache class and implementing its' abstract methods.
+
+AbstractMnemosyneCache provides a specification of what does mnemosyne expect a caching algorithm to look like in order to function.
+Any cache algorithm following this specification should be able to work with mnemosyne without problems.
 
 ### Limitations & Precautions
 

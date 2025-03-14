@@ -19,7 +19,7 @@ public abstract class AbstractGenericCache<K, ID, V> extends AbstractMnemosyneCa
     final long timeToLive;
     final long invalidationInterval;
     final int totalCapacity;
-    final float actualCapacity;
+    final float actualCapacity; //important: in AbstractGenericCaches, this is key-capacity, not value capacity!
     final short preemptiveEvictionPercentage;
     final short evictionStepPercentage;
     final boolean handleCollectionKeysSeparately;
@@ -27,8 +27,7 @@ public abstract class AbstractGenericCache<K, ID, V> extends AbstractMnemosyneCa
 
 
     public AbstractGenericCache(CacheParameters parameters, ValuePool<ID, V> valuePool) {
-        super();
-        this.keyIdMapper = new ConcurrentHashMap<>();
+        super(parameters, valuePool, new ConcurrentHashMap<K, IdWrapper<ID>>());
         this.valuePool = valuePool;
         this.totalCapacity = (parameters.getCapacity() <= 0 ? Integer.MAX_VALUE : parameters.getCapacity());
         this.timeToLive = (parameters.getTimeToLive() <= 0 ? Long.MAX_VALUE : parameters.getTimeToLive());
@@ -74,7 +73,7 @@ public abstract class AbstractGenericCache<K, ID, V> extends AbstractMnemosyneCa
         return this.returnsCollection;
     }
 
-    abstract boolean idUsedAlready(ID id);
+    public abstract boolean idUsedAlready(ID id);
 
     /**
      * Forcibly invalidates the cache at regular intervals, depending on the presence or absence of an invalidationInterval parameter in the cache.

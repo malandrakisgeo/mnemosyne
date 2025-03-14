@@ -4,8 +4,9 @@ package com.gmalandrakis.mnemosyne.structures;
  * The structure used to wrap IDs internally in implementations of {@link com.gmalandrakis.mnemosyne.cache.AbstractGenericCache AbstractGenericCache},
  * along with metadata such as creation time, last access time, and number of hits.
  * <p>
- * A key can correspond to either an ID (in caches that return single values for a key, ), or in multiple IDs (in caches
- * that return whole Collections for every ID). Hence the two implementations of this class.
+ * A key can correspond to either one ID (in caches that return single values for a key), or multiple IDs (in caches
+ * that return whole Collections for every ID). Hence the two implementations of this class. The metadata are, in essence,
+ * for the key and not the IDs itself, since the same ID can be contained in multiple IdWrappers.
  *
  * @author George Malandrakis (malandrakisgeo@gmail.com)
  */

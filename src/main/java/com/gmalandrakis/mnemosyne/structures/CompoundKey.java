@@ -7,8 +7,6 @@ import java.util.Arrays;
  * all the arguments to a {@link com.gmalandrakis.mnemosyne.annotations.Cached @Cached} function are assembled to a CompoundKey.
  * <p>
  * The CompoundKey consists of an array of objects. The deep contents of the objects are taken into account for the hash code and the equality.
- * <p>
- * </p>
  *
  * @author George Malandrakis (malandrakisgeo@gmail.com)
  */

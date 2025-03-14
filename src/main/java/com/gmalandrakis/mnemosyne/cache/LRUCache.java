@@ -23,8 +23,8 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {    //WI
 
     /*
         In collection caches, a key corresponds to multiple IDs. We need a way to know how many keys are using an ID without transversing through
-        the whole map of keys and their ID-collections every time.
-        In single-value caches, more often than not, there is a 1-1 correspondence between keys and IDs. But this is not *guaranteed*
+        the whole map of keys and all their ID-collections every time.
+        In single-value caches, more often than not, there is a 1-1 correspondence between keys and IDs. But this is still not *guaranteed*
         (fun exercise: come up with cases where different keys may point to the same object/ID) , and especially when we
         are dealing with cache updates: we may want to use a key with a brand new value and corresponding ID.
         By keeping track of how many keys are using an ID, we can accurately inform the ValuePool that it may be time to get rid of an ID and its' corresponding
@@ -247,7 +247,7 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {    //WI
     }
 
     @Override
-    boolean idUsedAlready(ID v) { //TODO: Delete this disgrace when coming up with something better
+    public boolean idUsedAlready(ID v) { //TODO: Delete this disgrace when coming up with something better
         var numberOfCollectionsUsingIt = numberOfUsesById.get(v);
         return numberOfCollectionsUsingIt != null && numberOfCollectionsUsingIt > 0;
     }

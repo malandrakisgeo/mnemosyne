@@ -2,10 +2,9 @@ package com.gmalandrakis.mnemosyne.core;
 
 import com.gmalandrakis.mnemosyne.structures.CacheValue;
 
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -27,7 +26,7 @@ public class ValuePool<ID, T> {
     }
 
     public List<T> getAll(Collection<ID> ids) {
-        List<T> list = new java.util.ArrayList<>();
+        List<T> list = new ArrayList<>();
         ids.forEach(id -> {
             var fromValueMap = valueMap.get(id);
             if (fromValueMap != null) {
@@ -47,14 +46,6 @@ public class ValuePool<ID, T> {
                 cachedValue.increaseNumberOfUses();
             }
         }
-    }
-
-    public Map<ID, Integer> removeOrDecreaseNumberOfUsesForIds(Collection<ID> ids) {
-        var numberOfUsesPerIdMap = new HashMap<ID, Integer>();
-        ids.forEach(id -> {
-            numberOfUsesPerIdMap.put(id, removeOrDecreaseNumberOfUsesForId(id));
-        });
-        return numberOfUsesPerIdMap;
     }
 
     public Integer removeOrDecreaseNumberOfUsesForId(ID id) {
@@ -80,28 +71,5 @@ public class ValuePool<ID, T> {
         return val.getNumberOfUses();
     }
 
-    public long getLastAccessed(ID id){
-        var val = valueMap.get(id);
-        if (val == null) {
-            return 0;
-        }
-        return val.getLastAccessed();
-    }
-
-    public int getHits(ID id){
-        var val = valueMap.get(id);
-        if (val == null) {
-            return 0;
-        }
-        return val.getHits();
-    }
-
-    public int getTotalOperations(ID id){
-        var val = valueMap.get(id);
-        if (val == null) {
-            return 0;
-        }
-        return val.getTotalOperations();
-    }
 
 }

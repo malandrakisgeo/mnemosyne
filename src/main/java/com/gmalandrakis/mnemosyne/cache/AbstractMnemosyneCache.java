@@ -1,15 +1,15 @@
 package com.gmalandrakis.mnemosyne.cache;
 
+import com.gmalandrakis.mnemosyne.core.ValuePool;
+import com.gmalandrakis.mnemosyne.structures.CacheParameters;
 import com.gmalandrakis.mnemosyne.structures.IdWrapper;
 
 import java.util.Collection;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
 
 /**
  * A general description of the Caches used by mnemosyne.
- * <p>
  *
  * @param <K>  The type of the keys used to retrieve the cache elements.
  * @param <ID> The type of ID of the values stored in the ValuePool,
@@ -22,8 +22,26 @@ public abstract class AbstractMnemosyneCache<K, ID, V> {
     /**
      * A map from the keys to the related ID values.
      * This should be a ConcurrentMap in order for mnemosyne to properly work in a multithreaded application.
+     * The IdWrapper can be either implementation, depending on whether the cache is expected to return whole collections for
+     * a key or single values.
      */
     ConcurrentMap<K, IdWrapper<ID>> keyIdMapper;
+
+    /**
+     * The ValuePool containing the mapping between IDs and values.
+     * This is automatically instantiated by mnemosyne for every cached type as a singleton.
+     */
+    ValuePool<ID, V> valuePool;
+
+    /**
+     * The implementations are expected to have a constructor that takes a CacheParameter, a ValuePool, and a ConcurrentMap as arguments.
+     * The CacheParameter and the ValuePool are instantiated by mnemosyne, whereas the ConcurrentMap is instantiated by the implementation itself.
+     * Which CacheParameters will eventually be used is also up to the implementation.
+     */
+    public AbstractMnemosyneCache(CacheParameters parameters, ValuePool<ID, V> valuePool, ConcurrentMap<K, IdWrapper<ID>> concurrentMap) {
+        this.keyIdMapper = concurrentMap;
+        this.valuePool = valuePool;
+    }
 
 
     /**
@@ -49,8 +67,20 @@ public abstract class AbstractMnemosyneCache<K, ID, V> {
      */
     public abstract void putInAllCollections(ID id, V value);
 
+    /**
+     * For collection caches -i.e. caches where one key can correspond to multiple values.
+     * An empty collection should be returned if no value corresponds to the key.
+     */
     public abstract Collection<V> getAll(K key);
 
+    /**
+     * Returns one or more values depending on the key collection. No 1-1 correlation between keys and values is assumed by mnemosyne
+     * except for caches explicitly configured for special collection-handling.
+     * Implementations should ignore keys that do not correspond to some value.
+     *
+     * <p>
+     * An empty collection should be returned if no key corresponds to a value.
+     */
     public abstract Collection<V> getAll(Collection<K> key);
 
     /**
@@ -84,6 +114,7 @@ public abstract class AbstractMnemosyneCache<K, ID, V> {
 
     /**
      * Removes an ID from all available entries of a collection cache independently of keys.
+     *
      * @param id
      */
 
@@ -115,7 +146,16 @@ public abstract class AbstractMnemosyneCache<K, ID, V> {
 
     /**
      * Returns whether the ID is already used by the cache.
+     * Implementations can either transverse through the ValuePool, or prefer a more computationally efficient solution,
+     * e.g. keeping ordered collections of the current IDs, or storing them in Maps that return the number of times each key is being used.
      */
-    abstract boolean idUsedAlready(ID id);
+    public abstract boolean idUsedAlready(ID id);
 
+    public ConcurrentMap<K, IdWrapper<ID>> getKeyIdMapper() {
+        return keyIdMapper;
+    }
+
+    public ValuePool<ID, V> getValuePool() {
+        return valuePool;
+    }
 }

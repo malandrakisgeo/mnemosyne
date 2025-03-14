@@ -1,9 +1,7 @@
 package com.gmalandrakis.mnemosyne.structures;
 
 public class SingleIdWrapper<ID> extends IdWrapper<ID> {
-
     ID singleId;
-
     public SingleIdWrapper(ID singleId){
         this.singleId = singleId;
         this.createdOn = System.currentTimeMillis();
