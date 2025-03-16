@@ -39,7 +39,7 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {    //WI
             return;
         }
 
-        if (numberOfUsesById.size() >= this.actualCapacity) {
+        if (recencyQueue.size() >= this.actualCapacity) {
             this.evict();
         }
         //We avoid iterative calls to put(), to avoid checking the keyIdMapper and concurrentFIFOQueue multiple times. One time suffices.
@@ -74,7 +74,7 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {    //WI
         if (key == null || id == null) {
             return;
         }
-        if (numberOfUsesById.size() >= this.actualCapacity) {
+        if (recencyQueue.size() >= this.actualCapacity) {
             this.evict();
         }
 

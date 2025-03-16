@@ -53,7 +53,7 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
             return;
         }
 
-        if (numberOfUsesById.size() >= this.actualCapacity) {
+        if (concurrentFIFOQueue.size() >= this.actualCapacity) {
             this.evict();
         }
         //We avoid iterative calls to put(), to avoid checking the keyIdMapper and concurrentFIFOQueue multiple times. One time suffices.
@@ -72,7 +72,7 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
         if (key == null || id == null) {
             return;
         }
-        if (numberOfUsesById.size() >= this.actualCapacity) {
+        if (concurrentFIFOQueue.size() >= this.actualCapacity) {
             this.evict();
         }
 

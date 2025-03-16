@@ -79,7 +79,7 @@ public @interface Cached {
      * By default, there is no capacity, and that means that all entries are kept in memory
      * as long as the program runs unless evicted by other mechanisms (e.g. expiration check, manual invalidation, removal via an @UpdatesCache, etc).
      * <p>
-     * In implementations of {@link AbstractGenericCache AbstractGenericCache}, this refers to the maximum number of IDs/values
+     * In implementations of {@link AbstractGenericCache AbstractGenericCache}, this refers to the maximum number of keys
      * allowed in memory, and zero or negative values are ignored.
      */
     int capacity() default 0;
