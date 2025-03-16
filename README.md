@@ -103,7 +103,8 @@ Feedback with results for other versions of Java or Spring, or even other JVM la
 
 ### General use
 Once the library is configured for the project, the first thing you need to do is to define the IDs of the objects to be cached.
-If the objects to be cached have an accessible  (i.e. either public or with a getter following Java naming conventions) field named Id (or ID, or id, or even iD), 
+
+If the objects to be cached have an accessible (i.e. either public or with a getter following Java naming conventions) field named Id (or ID, or id, or even iD), 
 you don't need to do anything extra.
 If it doesn't, or if you want to use another field as an ID, all you need to do is to annotate the related field(s) as @Id.
 Multiple fields annotated with @Id form a compound Id.
@@ -130,11 +131,11 @@ the methods to be cached, as you see in the examples below:
  
     @UpdatesCache(name="getTransactionById", targetObjectKeys={"id"}, addMode = AddMode.DEFAULT)
     @UpdatesCache(name="getTransactionByIds", targetObjectKeys={"id"}, addMode = AddMode.ADD_VALUES_TO_COLLECTION)
-    @UpdatesCache(name="completedTransactionCache", targetObjectKeys={"userId", "isCompleted"}, addMode = AddMode.ADD_VALUES_TO_COLLECTION, conditionalAdd="isCompleted", 
-    removeMode = RemoveMode.REMOVE_VALUE_FROM_COLLECTION, conditionalRemove="!isCompleted")
-    @UpdatesCache(name="getPendingTransactions", removeMode = RemoveMode.REMOVE_VALUE_FROM_COLLECTION, conditionalRemove="!transaction.isCompleted")
+    @UpdatesCache(name="completedTransactionCache", targetObjectKeys={"userId", "isCompleted"}, addMode = AddMode.ADD_VALUES_TO_COLLECTION, addOnCondition="isCompleted", 
+    removeMode = RemoveMode.REMOVE_VALUE_FROM_COLLECTION, removeOnCondition="!isCompleted")
+    @UpdatesCache(name="getPendingTransactions", removeMode = RemoveMode.REMOVE_VALUE_FROM_COLLECTION, removeOnCondition="!transaction.isCompleted")
     @UpdatesCache(name="getPendingTransactionsByUser", removeMode = RemoveMode.REMOVE_VALUE_FROM_COLLECTION, addMode = AddMode.ADD_VALUES_TO_COLLECTION, 
-    conditionalRemove="!transaction.isCompleted", conditionalAdd="transaction.isCompleted", targetObjectKeys="userId")
+    removeOnCondition="!transaction.isCompleted", addOnCondition="transaction.isCompleted", targetObjectKeys="userId")
     public void saveTransaction(@UpdatedValue Transaction transaction);
 
 

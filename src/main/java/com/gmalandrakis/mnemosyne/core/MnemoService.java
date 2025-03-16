@@ -99,8 +99,8 @@ public class MnemoService {
         var targetKeyNamesAndValues = linkTargetObjectKeysToObjects(List.of(targetObjectKeyNamesAndValues), finalUpdatedValue);
         var annotatedKeyNamesAndValues = getUpdateKeyNamesAndCorrespondingValues(invokedMethod, updateCache.annotatedKeys(), args);
 
-        var conditionalRemoval = getCondition(updateCache.conditionalRemove(), annotatedKeyNamesAndValues, updatedValue, updateCache.conditionalANDGate());
-        var conditionalAdd = getCondition(updateCache.conditionalAdd(), annotatedKeyNamesAndValues, updatedValue, updateCache.conditionalANDGate());
+        var conditionalRemoval = getCondition(updateCache.removeOnCondition(), annotatedKeyNamesAndValues, updatedValue, updateCache.conditionalANDGate());
+        var conditionalAdd = getCondition(updateCache.addOnCondition(), annotatedKeyNamesAndValues, updatedValue, updateCache.conditionalANDGate());
         var key = getCompoundKeyForUpdate(annotatedKeyNamesAndValues, targetKeyNamesAndValues, updateCache.keyOrder(), cachedMethod, cacheToBeUpdated.isSpecialCollectionHandlingEnabled());
 
         if (idOfUpdatedValue == null && updatedValue == null) { //this can only happen on key removal.
@@ -290,8 +290,8 @@ public class MnemoService {
             }
 
             if (updateCache.removeMode() != UpdatesCache.RemoveMode.NONE && updateCache.addMode() != UpdatesCache.AddMode.NONE) {
-                var condAdd = updateCache.conditionalAdd();
-                var condRem = updateCache.conditionalRemove();
+                var condAdd = updateCache.addOnCondition();
+                var condRem = updateCache.removeOnCondition();
                 if (condAdd.length == 1 && condAdd[0].isEmpty() && condRem.length == 1 && condRem[0].isEmpty()) {
                     throw new MnemosyneUpdateException("An UpdatesCache with no define conditions either adds or removes."); //TODO: test
                 }

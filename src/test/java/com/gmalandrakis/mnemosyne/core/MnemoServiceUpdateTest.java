@@ -111,7 +111,7 @@ public class MnemoServiceUpdateTest {
             return null;
         }
 
-        //   @UpdateCache(name = "getByAgeActivatedOnly", targetObjectKeys = {"age"}, conditionalAdd = "activated", conditionalDelete = "!activated")
+        //   @UpdateCache(name = "getByAgeActivatedOnly", targetObjectKeys = {"age"}, addOnCondition = "activated", conditionalDelete = "!activated")
         //   @UpdateCache(name = "getByAgeAndActivated", targetObjectKeys = {"age", "accountActivated"})
         @UpdatesCache(name = "getByAgeAndActivated", targetObjectKeys = {"age", "accountActivated"}, addMode = AddMode.DEFAULT, removeMode = RemoveMode.NONE)
         @UpdatesCache(name = "test9", targetObjectKeys = "id", addMode = AddMode.DEFAULT, removeMode = RemoveMode.NONE)

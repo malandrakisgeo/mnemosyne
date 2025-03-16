@@ -10,23 +10,14 @@ public class CacheParameters {
 
     private Class<? extends AbstractMnemosyneCache> cacheType;
     private String cacheName;
-
     private long timeToLive;
-
     private int capacity;
-
     private long invalidationInterval;
-
     private int threadPoolSize;
-
     private boolean countdownFromCreation;
-
     private short preemptiveEvictionPercentage;
-
     private short evictionStepPercentage;
-
     private boolean handleCollectionKeysSeparately;
-
     private boolean returnsCollection;
 
 

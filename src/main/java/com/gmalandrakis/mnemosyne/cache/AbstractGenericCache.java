@@ -19,7 +19,7 @@ public abstract class AbstractGenericCache<K, ID, V> extends AbstractMnemosyneCa
     final long timeToLive;
     final long invalidationInterval;
     final int totalCapacity;
-    final float actualCapacity; //important: in AbstractGenericCaches, this is key-capacity, not value capacity!
+    final float actualCapacity;
     final short preemptiveEvictionPercentage;
     final short evictionStepPercentage;
     final boolean handleCollectionKeysSeparately;

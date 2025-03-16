@@ -9,7 +9,7 @@ public class ParameterUtils {
     public static CacheParameters annotationValuesToCacheParameters(Cached annotation, boolean returnsCollection, boolean handleCollectionKeysSeparately) {
         var cacheParameters = new CacheParameters();
         cacheParameters.setCacheName(annotation.cacheName());
-        cacheParameters.setCapacity(annotation.capacity());
+        cacheParameters.setCapacity(annotation.capacity()); //TODO: Set an ID-capacity and a key-capacity instead. These are synonymous on single-value caches, but not on collection ones.
         cacheParameters.setCountdownFromCreation(annotation.countdownFromCreation());
         cacheParameters.setTimeToLive(annotation.timeToLive());
         cacheParameters.setInvalidationInterval(annotation.invalidationInterval());

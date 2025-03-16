@@ -87,31 +87,31 @@ public @interface UpdatesCache {
      * These values are either annotated as @UpdateKey with the given name, or are present as fields in the
      * target object (i.e. the object annotated with @UpdatedValue or returned from the function, if an @UpdatedValue is absent).
      * <p>
-     * The keys are be default used in an AND gate. You may set conditionalANDGate to false if you prefer an OR.
+     * By default, if multiple conditions are present, a logical AND applies (i.e. all have to be true). You may set conditionalANDGate to false if you prefer a logical OR.
      * <p>
      * If the keys cannot be cast to boolean, an exception is thrown.
      * <p>
-     * If the result of the conditionalAdd operation clashes with the one for the conditionalDelete, an exception is thrown.
+     * If the result of the addOnCondition operation clashes with the one for the conditionalDelete, an exception is thrown.
      * <p>
      * Booleans we want to be negative must start with an exclamation mark ('!').
      * <p>
      * Example:
      * <pre>
      *       {@code
-     *       @UpdatesCache(name="getActiveUsers", conditionalAdd={"isActivated", "isVerified"}, conditionalRemove={"!isActivated"})
+     *       @UpdatesCache(name="getActiveUsers", addOnCondition={"isActivated", "isVerified"}, removeOnCondition={"!isActivated"})
      *       public void saveUserDetails(@UpdatedValue User newUser)
      *       }
      *       </pre>
      */
-    String[] conditionalAdd() default "";
+    String[] addOnCondition() default "";
 
     /**
-     * Similar to conditionalAdd.
+     * Similar to addOnCondition.
      */
-    String[] conditionalRemove() default "";
+    String[] removeOnCondition() default "";
 
     /**
-     * If set to true, all conditions in the conditionalAdd and conditionalRemove have to be true in order for the new element to be added/removed.
+     * If set to true, all conditions in the addOnCondition and removeOnCondition have to be true in order for the new element to be added/removed.
      * Otherwise one suffices.
      */
     boolean conditionalANDGate() default true;

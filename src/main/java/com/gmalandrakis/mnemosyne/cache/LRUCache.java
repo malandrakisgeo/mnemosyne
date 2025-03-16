@@ -39,7 +39,7 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {    //WI
             return;
         }
 
-        if (recencyQueue.size() >= this.actualCapacity) {
+        if (numberOfUsesById.size() >= this.actualCapacity) {
             this.evict();
         }
         //We avoid iterative calls to put(), to avoid checking the keyIdMapper and concurrentFIFOQueue multiple times. One time suffices.
@@ -74,7 +74,7 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {    //WI
         if (key == null || id == null) {
             return;
         }
-        if (recencyQueue.size() >= this.actualCapacity) {
+        if (numberOfUsesById.size() >= this.actualCapacity) {
             this.evict();
         }
 
@@ -230,10 +230,12 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {    //WI
             expiredValues.forEach(this::remove);
         }
 
-        while (recencyQueue.size() >= this.actualCapacity) {
+        while (numberOfUsesById.size() >= this.actualCapacity) {
             var oldestElement = recencyQueue.poll();
             if (oldestElement != null) {
                 remove(oldestElement);
+            }else{
+                break;
             }
         }
     }
@@ -247,7 +249,7 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {    //WI
     }
 
     @Override
-    public boolean idUsedAlready(ID v) { //TODO: Delete this disgrace when coming up with something better
+    public boolean idUsedAlready(ID v) {
         var numberOfCollectionsUsingIt = numberOfUsesById.get(v);
         return numberOfCollectionsUsingIt != null && numberOfCollectionsUsingIt > 0;
     }

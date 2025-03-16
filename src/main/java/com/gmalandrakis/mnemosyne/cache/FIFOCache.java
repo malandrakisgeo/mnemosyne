@@ -41,6 +41,8 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
      */
     final ConcurrentHashMap<ID, Integer> numberOfUsesById = new ConcurrentHashMap<ID, Integer>();
 
+    private int idsInCache = 0;
+
     public FIFOCache(CacheParameters parameters, ValuePool poolService) {
         super(parameters, poolService);
     }
@@ -51,7 +53,7 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
             return;
         }
 
-        if (concurrentFIFOQueue.size() >= this.actualCapacity) {
+        if (numberOfUsesById.size() >= this.actualCapacity) {
             this.evict();
         }
         //We avoid iterative calls to put(), to avoid checking the keyIdMapper and concurrentFIFOQueue multiple times. One time suffices.
@@ -70,7 +72,7 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
         if (key == null || id == null) {
             return;
         }
-        if (concurrentFIFOQueue.size() >= this.actualCapacity) {
+        if (numberOfUsesById.size() >= this.actualCapacity) {
             this.evict();
         }
 
@@ -181,9 +183,10 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
             if (cacheData == null) {
                 return;
             }
-            if(cacheData.getIds().remove(id)){
+            if (cacheData.getIds().remove(id)) {
                 removeOrDecreaseIdUses(id);
-            };
+            }
+            ;
         }
     }
 
@@ -225,10 +228,12 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
             expiredValues.forEach(this::remove);
         }
 
-        while (concurrentFIFOQueue.size() >= this.actualCapacity) {
+        while (numberOfUsesById.size() >= this.actualCapacity) {
             var oldestElement = concurrentFIFOQueue.poll();
             if (oldestElement != null) {
                 remove(oldestElement);
+            } else {
+                break;
             }
         }
     }

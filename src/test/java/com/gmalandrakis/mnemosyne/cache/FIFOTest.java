@@ -24,9 +24,9 @@ public class FIFOTest {
 
     FIFOCache<Integer, Integer, Integer> collectionIntegerCache;
 
-    FIFOCache<Integer, Object, testObject> singleTestobjectCache;
+    FIFOCache<Integer, Object, testObject> singleTestObjectCache;
 
-    FIFOCache<Integer, String, testObject> collectionTestobjectCache;
+    FIFOCache<Integer, String, testObject> collectionTestObjectCache;
 
     FIFOCache<Integer, String, Integer> separateHandlingCache;
     FIFOCache<Integer, String, Integer> separateHandlingCache2;
@@ -49,7 +49,7 @@ public class FIFOTest {
         cacheParameters.setCacheName("fifo-single");
         cacheParameters.setThreadPoolSize(2);
         singleIntegerCache = new FIFOCache<>(cacheParameters, valuePool);
-        singleTestobjectCache = new FIFOCache<>(cacheParameters, testObjectValuePool);
+        singleTestObjectCache = new FIFOCache<>(cacheParameters, testObjectValuePool);
         cacheParameters.setReturnsCollection(true);
         collectionIntegerCache = new FIFOCache<>(cacheParameters, valuePool);
 
@@ -60,7 +60,7 @@ public class FIFOTest {
         cacheParameters.setReturnsCollection(true);
         cacheParameters.setHandleCollectionKeysSeparately(false);
 
-        collectionTestobjectCache = new FIFOCache<>(cacheParameters, testObjectValuePool);
+        collectionTestObjectCache = new FIFOCache<>(cacheParameters, testObjectValuePool);
         cacheParameters.setHandleCollectionKeysSeparately(true);
 
         cacheParameters.setThreadPoolSize(50);
@@ -110,46 +110,44 @@ public class FIFOTest {
             var id = GeneralUtils.deduceId(object);
             intlst.add(i);
 
-            collectionTestobjectCache.putAll(i, ids);
-            singleTestobjectCache.put(i, id, object);
+            collectionTestObjectCache.putAll(i, ids);
+            singleTestObjectCache.put(i, id, object);
         }
         assert (testObjectValuePool.getSize() == 10);
 
         var id = GeneralUtils.deduceId( this.gettestObject(0));
         assert (testObjectValuePool.getNumberOfUsesForId(id) == 2);
-        assert (collectionTestobjectCache.numberOfUsesById.get(id) == 9);
-        assert (singleTestobjectCache.numberOfUsesById.get(id) == 1);
+        assert (collectionTestObjectCache.numberOfUsesById.get(id) == 9);
+        assert (singleTestObjectCache.numberOfUsesById.get(id) == 1);
 
-        var value = singleTestobjectCache.get(1);
-        var collectionValue = collectionTestobjectCache.getAll(1).stream().toList();
+        var value = singleTestObjectCache.get(1);
+        var collectionValue = collectionTestObjectCache.getAll(1).stream().toList();
 
         assert (collectionValue.contains(value));
         assert (collectionValue.size() == 2);
 
-        var value2 = singleTestobjectCache.get(2);
-        var collectionValue2 = collectionTestobjectCache.getAll(2).stream().toList();
+        var value2 = singleTestObjectCache.get(2);
+        var collectionValue2 = collectionTestObjectCache.getAll(2).stream().toList();
 
         assert (collectionValue2.contains(value2));
         assert (collectionValue2.size() == 3);
-        assert (!collectionTestobjectCache.concurrentFIFOQueue.isEmpty());
+        assert (!collectionTestObjectCache.concurrentFIFOQueue.isEmpty());
 
-        collectionTestobjectCache.remove(9); //testobject 9 referred to only once by collectiontestobjectcache
-        singleTestobjectCache.remove(9); //testobject 9 referred to only once by collectiontestobjectcache
+        collectionTestObjectCache.remove(9); //testobject 9 referred to only once by collectiontestobjectcache
+        singleTestObjectCache.remove(9); //testobject 9 referred to only once by collectiontestobjectcache
 
         Thread.sleep(500);
         assert (testObjectValuePool.getValue(String.valueOf(9)) == null);
         // assert (singleTestobjectCache.numberOfUsesById.get(String.valueOf(9)) == null); TODO
 
-        singleTestobjectCache.invalidateCache();
-        collectionTestobjectCache.invalidateCache();
-
+        singleTestObjectCache.invalidateCache();
+        collectionTestObjectCache.invalidateCache();
     }
-
 
     @Test
     public void testFifoUpdatesOnExistingKeys(){
-        singleTestobjectCache.invalidateCache();
-        collectionTestobjectCache.invalidateCache();
+        singleTestObjectCache.invalidateCache();
+        collectionTestObjectCache.invalidateCache();
 
         var testobj = this.gettestObject(1);
         var testobj2 = this.gettestObject(2);
@@ -157,50 +155,46 @@ public class FIFOTest {
         var id = GeneralUtils.deduceId(testobj);
         var id2 = GeneralUtils.deduceId(testobj2);
 
-        singleTestobjectCache.put(1, id, testobj);
-        assert (singleTestobjectCache.numberOfUsesById.get(id) == 1);
-        assert (singleTestobjectCache.get(1).equals(testobj));
+        singleTestObjectCache.put(1, id, testobj);
+        assert (singleTestObjectCache.numberOfUsesById.get(id) == 1);
+        assert (singleTestObjectCache.get(1).equals(testobj));
         assert (testObjectValuePool.getNumberOfUsesForId(id) == 1);
 
         //using the same key and id with an updated value should be possible
-        singleTestobjectCache.put(1, id, testobj2);
-        assert (singleTestobjectCache.numberOfUsesById.get(id) == 1);
+        singleTestObjectCache.put(1, id, testobj2);
+        assert (singleTestObjectCache.numberOfUsesById.get(id) == 1);
         assert (testObjectValuePool.getValue(id).equals(testobj2));
         assert (testObjectValuePool.getNumberOfUsesForId(id) == 1);
 
         //using the same key with a brand new id/value should be possible.
-        singleTestobjectCache.put(1, id2, testobj2);
-        assert (singleTestobjectCache.numberOfUsesById.get(id) == null);
+        singleTestObjectCache.put(1, id2, testobj2);
+        assert (singleTestObjectCache.numberOfUsesById.get(id) == null);
         assert (testObjectValuePool.getNumberOfUsesForId(id) == 0);
-        assert (singleTestobjectCache.numberOfUsesById.get(id2) == 1);
+        assert (singleTestObjectCache.numberOfUsesById.get(id2) == 1);
         assert (testObjectValuePool.getNumberOfUsesForId(id2) == 1);
-
-        assert (singleTestobjectCache.get(1).equals(testobj2));
-
+        assert (singleTestObjectCache.get(1).equals(testobj2));
     }
-
 
 
     @Test
     public void testFifoFlow() throws InterruptedException {
         cacheParameters.setCapacity(100);
         cacheParameters.setTimeToLive(9999999999L);
+        cacheParameters.setPreemptiveEvictionPercentage((short) 100);
 
-        collectionTestobjectCache = new FIFOCache<>(cacheParameters, testObjectValuePool);
+        collectionTestObjectCache = new FIFOCache<>(cacheParameters, testObjectValuePool);
 
-        for (int i = 0; i < 100; i++) {
-            var objects = this.getTestObjects(i);
-            var ids = (Map) GeneralUtils.deduceId(objects);
-
-            collectionTestobjectCache.putAll(i, ids);
+        for(int i = 0; i < 100; i++){
+            var object = this.gettestObject(i);
+            var id = (String) GeneralUtils.deduceId(object);
+            collectionTestObjectCache.putAll(i, Map.of(id, object));
         }
         assert (testObjectValuePool.getSize() == 100);
-        var objects = this.getTestObjects(200);
-        var ids = (Map) GeneralUtils.deduceId(objects);
-        collectionTestobjectCache.putAll(200, ids);
-        assert (collectionTestobjectCache.concurrentFIFOQueue.size() == 100);
-        assert (collectionTestobjectCache.getAll(0).isEmpty());
-//TODO the same for concurrent reads and writes
+        var object = this.gettestObject(101);
+        var id = (String) GeneralUtils.deduceId(object);
+        collectionTestObjectCache.putAll(100, Map.of(id, object));
+        assert (collectionTestObjectCache.numberOfUsesById.size() == 100);
+        assert (collectionTestObjectCache.getAll(0).isEmpty());
     }
 
 
@@ -239,9 +233,9 @@ public class FIFOTest {
 
         /*
             The test below:
-            1. Iteratively generates a 0<N<1000 lists of integers that contain values from 1 to N, where
+            1. Iteratively generates a 0<N<1000 lists of integers that contain values from 1 to N
             2. Deduces the IDs of those lists after treating them as string values.
-            3. Puts all lists and ids in two separeteHandling-caches
+            3. Puts all lists and ids in two separateHandling-caches
             4. verifies  the value pool has correct number of cachesUsingValue after putting, and after invalidating in one cache
             5. Gives us some hints about the speed to do all these in separateHandling caches
          */

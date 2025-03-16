@@ -20,8 +20,9 @@ import java.util.concurrent.ConcurrentMap;
  */
 public abstract class AbstractMnemosyneCache<K, ID, V> {
     /**
-     * A map from the keys to the related ID values.
+     * A map from the keys to the related ID values along with key-specific metadata.
      * This should be a ConcurrentMap in order for mnemosyne to properly work in a multithreaded application.
+     * <p>
      * The IdWrapper can be either implementation, depending on whether the cache is expected to return whole collections for
      * a key or single values.
      */
@@ -30,6 +31,8 @@ public abstract class AbstractMnemosyneCache<K, ID, V> {
     /**
      * The ValuePool containing the mapping between IDs and values.
      * This is automatically instantiated by mnemosyne for every cached type as a singleton.
+     * <p>
+     * Every addition, update, or removal to a cache <b>must</b> update the ValuePool in order for mnemosyne to work properly with multiple caches and annotation-driven updates.
      */
     ValuePool<ID, V> valuePool;
 
@@ -46,25 +49,19 @@ public abstract class AbstractMnemosyneCache<K, ID, V> {
 
     /**
      * Adds the given key-value pair to the cache.
-     *
-     * @param key
-     * @param value
      */
     public abstract void put(K key, ID id, V value);
 
     /**
-     * @param key
-     * @param ídValueMap
+     * Adds multiple values along with their IDs for a single key.
+     * Should only be implemented for collection caches.
      */
     public abstract void putAll(K key, Map<ID, V> ídValueMap);
 
     /**
      * Adds a particular ID in all available collection caches independently of the keys corresponding to them.
-     * Should only be implemented for algorithms that may be used for caching collections.
-     *
-     * @param id
-     * @param value
-     */
+     * Should only be implemented for collection caches.
+     **/
     public abstract void putInAllCollections(ID id, V value);
 
     /**
@@ -76,8 +73,8 @@ public abstract class AbstractMnemosyneCache<K, ID, V> {
     /**
      * Returns one or more values depending on the key collection. No 1-1 correlation between keys and values is assumed by mnemosyne
      * except for caches explicitly configured for special collection-handling.
+     * <p>
      * Implementations should ignore keys that do not correspond to some value.
-     *
      * <p>
      * An empty collection should be returned if no key corresponds to a value.
      */
@@ -86,8 +83,6 @@ public abstract class AbstractMnemosyneCache<K, ID, V> {
     /**
      * Retrieves a value for a given key.
      *
-     * @param key
-     * @return
      */
     public abstract V get(K key);
 
@@ -97,7 +92,6 @@ public abstract class AbstractMnemosyneCache<K, ID, V> {
      * If the underlying cache stores Collections of objects, all associated objects
      * may be removed from the ValuePool if eligible.
      *
-     * @param key
      */
     public abstract void remove(K key);
 
@@ -107,16 +101,12 @@ public abstract class AbstractMnemosyneCache<K, ID, V> {
      * corresponding to the given key.
      * If no key is provided, the ID is removed from all collections for all available keys.
      *
-     * @param key
-     * @param id
      */
     public abstract void removeOneFromCollection(K key, ID id);
 
     /**
      * Removes an ID from all available entries of a collection cache independently of keys.
-     *
-     * @param id
-     */
+     **/
 
     public abstract void removeFromAllCollections(ID id);
 
@@ -130,7 +120,6 @@ public abstract class AbstractMnemosyneCache<K, ID, V> {
      * Used to retrieve the next element that is of most interest to the algorithm.
      * A use case example is getting the key of the object that should be evicted next.
      *
-     * @return The key of the element that the eviction algorithm may target next.
      */
     public abstract K getTargetKey();
 

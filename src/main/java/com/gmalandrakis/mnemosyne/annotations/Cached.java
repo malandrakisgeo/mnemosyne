@@ -73,12 +73,14 @@ public @interface Cached {
     /**
      * The maximum number of entries in the cache.
      * <p>
-     * The use of this value is up to the implementation of the AbstractMnemosyneCache.
+     * The use of this value is up to the implementation of the AbstractMnemosyneCache. Depending on the implementation, it may set a limit on
+     * the IDs/values saved, or a limit on the keys independently of how many IDs/values they are associated with, or a limit on both.
      * <p>
      * By default, there is no capacity, and that means that all entries are kept in memory
-     * as long as the program runs unless evicted by other mechanisms (e.g. expiration check).
+     * as long as the program runs unless evicted by other mechanisms (e.g. expiration check, manual invalidation, removal via an @UpdatesCache, etc).
      * <p>
-     * In implementations of {@link AbstractGenericCache AbstractGenericCache}, zero and negative values are ignored.
+     * In implementations of {@link AbstractGenericCache AbstractGenericCache}, this refers to the maximum number of IDs/values
+     * allowed in memory, and zero or negative values are ignored.
      */
     int capacity() default 0;
 
@@ -96,12 +98,12 @@ public @interface Cached {
      * Evict preemptively if the size of the cache exceeds a certain percentage of the total capacity.
      * <p>
      * Depending on the size of the cache, the complexity of the algorithm, and the number of threads concurrently writing on it,
-     * starting the eviction only after the total capacity is reached, can take time.
-     * It may be prudent to start the procedure before the cache size reaches 100% of the capacity.
+     * it may be problematic to start the eviction only after the total capacity is reached. It can take time to determine the values
+     * to be evicted, as well as removing them from all related structures. It may be prudent to start the procedure before the cache size reaches 100% of the capacity.
      * <p>
      * The use of this value is up to the implementation of the AbstractMnemosyneCache.
      * <p>
-     * In implementations of {@link AbstractGenericCache AbstractGenericCache}, values over 100 or negative are switched to 80. An internal thread periodically checks
+     * In implementations of {@link AbstractGenericCache AbstractGenericCache}, values over 100 or negative are switched to 100. An internal thread periodically checks
      * the current size of the cache and starts evicting once the percentage of the size compared to total capacity is equal or larger than this.
      * A value of 0 or 100 means that only the total capacity is taken into account.
      */
@@ -133,19 +135,12 @@ public @interface Cached {
      * <p>
      * Setting to true can make your cache more effective in the long-term, but may make it slower in the beginning.
      * Should not be set to true if the underlying method calls a pay-per-request service.
-     * Setting to true is not recommended unless absolutely necessary,
+     * Setting to true is not recommended unless necessary,
      * and <b>strongly discouraged</b> in cases where the length and/or element order of the collection used as argument
      * or returned plays any role (e.g. Collection of XY coordinates).
      */
     boolean allowSeparateHandlingForKeyCollections() default false;
 
 
-    /**
-     * Only taken into account for collection-caches that do not have separeteHandling enabled.
-     * If set to true, mnemosyne does some smarter handling both when fetching and when updating.
-     * The handling is rather similar to allowSeparateHandlingForKeyCollections, except no 1-1 correlation
-     * between keys and values is assumed, and the mapping steps are skipped
-     */
-    boolean keyIsIdCollection() default false;
 
 }
