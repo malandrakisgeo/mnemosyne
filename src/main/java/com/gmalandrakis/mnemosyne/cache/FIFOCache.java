@@ -224,18 +224,19 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
     @Override
     public void evict() {
         if (timeToLive != Long.MAX_VALUE && timeToLive > 0) {
-            var expiredValues = keyIdMapper.entrySet().stream().filter(this::isExpired).map(Map.Entry::getKey);
+            var expiredValues = keyIdMapper.entrySet().stream().filter(this::isExpired).map(Map.Entry::getKey); //Filtrarisma prwtistws se aparxaiwmenes times, pou tha einai kai lathos an epistrafoun. TODO: Isws kana expiration check ston getter()?
             expiredValues.forEach(this::remove);
         }
 
         while (numberOfUsesById.size() >= this.actualCapacity) {
-            var oldestElement = concurrentFIFOQueue.poll();
+            var oldestElement = concurrentFIFOQueue.poll(); //Gibt das erste Element zuruck und entfernt es aus der Queue
             if (oldestElement != null) {
                 remove(oldestElement);
-            } else {
-                break;
+            } else { //Om queue:n är tom då finns det (nog) inget att ta bort.
+                break; //Io sono una anatra
             }
         }
+        //qifsha ropt
     }
 
     @Override
