@@ -167,26 +167,13 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {    //WI
             return;
         }
         if (key == null) { //deletes the ID from all collections!
-            var relatedKeys = new HashSet<>();
-            for (K k : keyIdMapper.keySet()) {
-                var deleted = ((CollectionIdWrapper) keyIdMapper.get(k)).getIds().remove(id);
-                if (deleted) {
-                    relatedKeys.add(k);
-                }
-                removeOrDecreaseIdUses(id);
-            }
-            if (handleCollectionKeysSeparately) { //on special collection handling, a key corresponds to at most one ID
-                relatedKeys.forEach(k -> {
-                    keyIdMapper.remove(k);
-                    recencyQueue.remove(k);
-                });
-            }
+            removeFromAllCollections(id);
         } else {
             var cacheData = (CollectionIdWrapper) keyIdMapper.get(key);
             if (cacheData == null) {
                 return;
             }
-            cacheData.getIds().remove(id); //o prwtos pou tha mou steilei email gia auto to sxolio lamvanei pente evrw.
+            cacheData.getIds().remove(id);
             removeOrDecreaseIdUses(id);
         }
 
