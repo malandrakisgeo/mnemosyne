@@ -7,7 +7,7 @@ It enables multiple caches that return the same object types to use a common Val
 values are mapped to particular IDs, thereby allowing for more efficient memory management and 
 easier updates.
 
-It allows the developer to implement custom caching algorithms by simply implementing an abstract class. 
+It allows the developer to implement custom caching algorithms by simply extending an abstract class. 
 By default, mnemosyne includes implementations of FIFO, LRU, and S3-FIFO.
 
 Mnemosyne currently works with Spring, but more integrations are coming.
