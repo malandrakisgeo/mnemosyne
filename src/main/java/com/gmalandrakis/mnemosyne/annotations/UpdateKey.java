@@ -7,13 +7,16 @@ import java.lang.annotation.Target;
 import static java.lang.annotation.ElementType.PARAMETER;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
-/**
- * Used for one or more arguments in a {@link com.gmalandrakis.mnemosyne.annotations.Cached @Cached} function.
- * <p>
- * If absent, all arguments are assembled in a {@link com.gmalandrakis.mnemosyne.structures.CompoundKey CompoundKey}
- */
 @Documented
 @Target({PARAMETER})
 @Retention(RUNTIME)
-public @interface Key {
+public @interface UpdateKey {
+
+    /**
+     * The name of the key, or the field of an object used as a key.
+     * If it refers to a field in the target object, it is assumed it has the same name as here, unless the nameInTarget is set.
+     */
+    String keyId();
+
+
 }

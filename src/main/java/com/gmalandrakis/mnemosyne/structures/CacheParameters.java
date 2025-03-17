@@ -10,20 +10,15 @@ public class CacheParameters {
 
     private Class<? extends AbstractMnemosyneCache> cacheType;
     private String cacheName;
-
     private long timeToLive;
-
     private int capacity;
-
     private long invalidationInterval;
-
     private int threadPoolSize;
-
     private boolean countdownFromCreation;
-
     private short preemptiveEvictionPercentage;
-
     private short evictionStepPercentage;
+    private boolean handleCollectionKeysSeparately;
+    private boolean returnsCollection;
 
 
     public String getCacheName() {
@@ -96,5 +91,21 @@ public class CacheParameters {
 
     public void setEvictionStepPercentage(short evictionStepPercentage) {
         this.evictionStepPercentage = evictionStepPercentage;
+    }
+
+    public boolean isHandleCollectionKeysSeparately() {
+        return handleCollectionKeysSeparately;
+    }
+
+    public void setHandleCollectionKeysSeparately(boolean handleCollectionKeysSeparately) {
+        this.handleCollectionKeysSeparately = handleCollectionKeysSeparately;
+    }
+
+    public boolean isReturnsCollection() {
+        return returnsCollection;
+    }
+
+    public void setReturnsCollection(boolean returnsCollection) {
+        this.returnsCollection = returnsCollection;
     }
 }

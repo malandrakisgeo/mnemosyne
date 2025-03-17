@@ -4,7 +4,7 @@ import com.gmalandrakis.mnemosyne.annotations.Cached;
 
 public class classwithanno {
 
-    @Cached(countdownFromCreation = true)
+    @Cached(cacheName = "anno",countdownFromCreation = true)
     public String getStr(Integer i) {
         if(i == 1){
             return "Yey!";

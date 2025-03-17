@@ -1,30 +1,19 @@
 package com.gmalandrakis.mnemosyne.cache;
 
-
 import com.gmalandrakis.mnemosyne.structures.CacheParameters;
-import com.gmalandrakis.mnemosyne.structures.GenericCacheValue;
+import com.gmalandrakis.mnemosyne.structures.IdWrapper;
+import com.gmalandrakis.mnemosyne.core.ValuePool;
+import com.gmalandrakis.mnemosyne.utils.GeneralUtils;
 
+import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/**
- * A specification of AbstractMnemosyneCache that includes threads that periodically evict the
- * expired or otherwise unnecessary Cache entries.
- * <p>
- * The fields declared here are explained in {@link com.gmalandrakis.mnemosyne.annotations.Cached @Cached}.
- * <p>
- * The build-in Cache algorithms provided by mnemosyne are implementations of AbstractGenericCache.
- * @param <K> The type of the keys used to retrieve the cache elements.
- * @param <V> The type of the cached value.
- *
- * @author George Malandrakis (malandrakisgeo@gmail.com)
- */
-public abstract class AbstractGenericCache<K, V> extends AbstractMnemosyneCache<K, V> {
+public abstract class AbstractGenericCache<K, ID, V> extends AbstractMnemosyneCache<K, ID, V> {
     final ExecutorService internalThreadService;
-    ConcurrentMap<K, GenericCacheValue<V>> cachedValues;
+    final ValuePool<ID, V> valuePool;
     final String name;
     final boolean countdownFromCreation;
     final long timeToLive;
@@ -33,65 +22,65 @@ public abstract class AbstractGenericCache<K, V> extends AbstractMnemosyneCache<
     final float actualCapacity;
     final short preemptiveEvictionPercentage;
     final short evictionStepPercentage;
+    final boolean handleCollectionKeysSeparately;
+    final boolean returnsCollection;
 
-    public AbstractGenericCache(CacheParameters parameters) {
-        super();
-        cachedValues = new ConcurrentHashMap<>();
+
+    public AbstractGenericCache(CacheParameters parameters, ValuePool<ID, V> valuePool) {
+        super(parameters, valuePool, new ConcurrentHashMap<K, IdWrapper<ID>>());
+        this.valuePool = valuePool;
         this.totalCapacity = (parameters.getCapacity() <= 0 ? Integer.MAX_VALUE : parameters.getCapacity());
         this.timeToLive = (parameters.getTimeToLive() <= 0 ? Long.MAX_VALUE : parameters.getTimeToLive());
         this.invalidationInterval = (parameters.getInvalidationInterval() < 0 ? Long.MAX_VALUE : parameters.getInvalidationInterval());
         this.name = parameters.getCacheName();
         this.countdownFromCreation = parameters.isCountdownFromCreation();
         this.preemptiveEvictionPercentage = (parameters.getPreemptiveEvictionPercentage() <= 0 || parameters.getPreemptiveEvictionPercentage() >= 100 ? 100 : parameters.getPreemptiveEvictionPercentage());
-        this.evictionStepPercentage =  (parameters.getEvictionStepPercentage() < 0 || parameters.getEvictionStepPercentage() > 100) ? 0 : parameters.getEvictionStepPercentage();
+        this.evictionStepPercentage = (parameters.getEvictionStepPercentage() < 0 || parameters.getEvictionStepPercentage() > 100) ? 0 : parameters.getEvictionStepPercentage();
         this.actualCapacity = (totalCapacity * (preemptiveEvictionPercentage / 100f));
-        if (parameters.getThreadPoolSize() != 0) {
+        if (parameters.getThreadPoolSize() > 5) {
             internalThreadService = Executors.newFixedThreadPool(parameters.getThreadPoolSize());
         } else {
             internalThreadService = Executors.newCachedThreadPool();
         }
+        this.handleCollectionKeysSeparately = parameters.isHandleCollectionKeysSeparately();
+        this.returnsCollection = parameters.isReturnsCollection();
         setInternalThreads();
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void put(K key, V value) {
-        cachedValues.put(key, new GenericCacheValue<>(value));
+    public abstract void putAll(K key, Map<ID, V> value);
+
+    public abstract void put(K key, ID id, V value);
+
+    public abstract V get(K key);
+
+    public abstract Collection<V> getAll(K key);
+
+    public abstract Collection<V> getAll(Collection<K> key);
+
+    public abstract void remove(K key);
+
+    public abstract void removeOneFromCollection(K key, ID id);
+
+    public abstract void evict();
+
+    public abstract void invalidateCache();
+
+    public boolean ishandleCollectionKeysSeparately() {
+        return handleCollectionKeysSeparately;
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public V get(K key) {
-        var val = cachedValues.get(key);
-        return val != null ? val.get() : null; //TODO: Add value expiration check
+    public boolean handlesCollections() {
+        return this.returnsCollection;
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void remove(K key) {
-        cachedValues.remove(key);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void invalidateCache() {
-        cachedValues.clear();
-    }
+    public abstract boolean idUsedAlready(ID id);
 
     /**
      * Forcibly invalidates the cache at regular intervals, depending on the presence or absence of an invalidationInterval parameter in the cache.
      */
     protected void forcedInvalidation() {
         while (true) {
-            sleepUninterrupted(invalidationInterval);
+            GeneralUtils.sleepUninterrupted(invalidationInterval);
             invalidateCache();
         }
     }
@@ -114,7 +103,7 @@ public abstract class AbstractGenericCache<K, V> extends AbstractMnemosyneCache<
      */
     protected void periodicallyEvict() {
         while (true) {
-            sleepUninterrupted(timeToLive);
+            GeneralUtils.sleepUninterrupted(timeToLive);
             evict();
         }
     }
@@ -122,35 +111,16 @@ public abstract class AbstractGenericCache<K, V> extends AbstractMnemosyneCache<
     /**
      * Checks if the particular entry is expired.
      */
-    protected boolean isExpired(Map.Entry<K, GenericCacheValue<V>> entry) {
+    protected boolean isExpired(Map.Entry<K, IdWrapper<ID>> entry) {
         long creationOrAccessTime = countdownFromCreation ? entry.getValue().getCreatedOn() : entry.getValue().getLastAccessed();
-        return (System.currentTimeMillis() - creationOrAccessTime) > this.timeToLive;         //System.currentTimeMillis() is very slow on Linux though very fast on Windows, but System.nanoTime() the opposite. TODO: Utreda
+        return (System.currentTimeMillis() - creationOrAccessTime) > this.timeToLive;    //System.currentTimeMillis() is very slow on Linux though very fast on Windows, but System.nanoTime() the opposite.
     }
 
     /**
-     * Puts the thread to sleep for a number of milliseconds, and suppresses the interrupts.
-     * This is only meant to be used by internal threads whose sole purpose is to do something periodically.
+     * Shared with MnemoProxy
      */
-    private void sleepUninterrupted(long sleepTime) {
-        boolean sleepComplete = false;
-        long sleepStarted = 0;
-        long remainingSleep;
-
-        remainingSleep = sleepTime;
-        while (!sleepComplete) {
-            try {
-                sleepStarted = System.currentTimeMillis();
-                Thread.sleep(remainingSleep);
-            } catch (InterruptedException e) {
-                //oops!
-            } finally {
-                remainingSleep = remainingSleep - (System.currentTimeMillis() - sleepStarted);
-            }
-            if (remainingSleep <= 0) {
-                sleepComplete = true;
-            }
-        }
+    public ExecutorService getInternalThreadService() {
+        return internalThreadService;
     }
-
 
 }
