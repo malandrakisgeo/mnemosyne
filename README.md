@@ -8,7 +8,7 @@ values are mapped to particular IDs, thereby allowing for more efficient memory 
 easier updates.
 
 It allows the developer to implement custom caching algorithms by simply extending an abstract class. 
-By default, mnemosyne includes implementations of FIFO, LRU, and S3-FIFO.
+By default, mnemosyne includes implementations of FIFO and LRU.
 
 Mnemosyne currently works with Spring, but more integrations are coming.
 
@@ -83,12 +83,10 @@ You are welcome to join our journey towards an even smarter cache!
 
 ## Using with Spring applications
 
-If using Java 17 and Spring boot 3 or above, all you need to do is to annotate the main class with @Import(
-MnemosyneSpringConf.class)
+If using Java 17 and Spring boot 3 or above, all you need to do is to annotate the main class with @Import(MnemosyneSpringConf.class)
 and the method you would like cached with @com.gmalandrakis.mnemosyne.annotations.Cached. 
 
-The rest is done by the
-library.
+The rest is done by the  library.
 
 You can even use your own cache algorithms by extending the AbstractMnemosyneCache, and referring to them in the @Cache
 annotation.
@@ -151,7 +149,7 @@ by extending the AbstractMnemosyneCache class and implementing its' abstract met
 AbstractMnemosyneCache provides a specification of what does mnemosyne expect a caching algorithm to look like in order to function.
 Any cache algorithm following this specification should be able to work with mnemosyne without problems.
 
-### Limitations & Precautions
+### Precautions
 
 #### Proxy objects
 As of 3/2025, mnemosyne's default caching algorithms may not work properly with proxy objects.
@@ -206,7 +204,7 @@ But this is nothing one person can achieve alone, so feel free to contribute!
 * Write more elaborate and cleaner documentation
 * Improve the exception handling
 * Overcome the limitations described earlier
-* Add support for LRU and S3-FIFO
+* Add support for LFU and S3-FIFO
 * Add better support for conditional update
 * Add easy configuration for non-Spring applications
 * Make all adjusts needed to make it work properly on distributed systems (final boss!)
@@ -216,9 +214,9 @@ Well, dozens! From changing variable names to deciding when to update asynchrono
 You may find some in the issues too.
 
 ### TODOs under discusssion
-* Add support for custom ID deduction (which solves the proxying problem)
+* Add support for custom ID deduction (which solves the proxy problem)
 * Add support for records
 
 ## Further documentation
-As of 1/2025, the documentation is provided in the code itself as javadoc.
+As of 3/2025, the documentation is provided in the code itself as javadoc.
 Running mvn javadoc:javadoc should suffice to generate a webpage with a general description.

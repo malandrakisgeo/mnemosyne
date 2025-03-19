@@ -99,7 +99,7 @@ public @interface Cached {
      * <p>
      * Depending on the size of the cache, the complexity of the algorithm, and the number of threads concurrently writing on it,
      * it may be problematic to start the eviction only after the total capacity is reached. It can take time to determine the values
-     * to be evicted, as well as removing them from all related structures. It may be prudent to start the procedure before the cache size reaches 100% of the capacity.
+     * to be evicted, as well as to remove them from all related structures. It may be prudent to start the procedure before the cache size reaches 100% of the capacity.
      * <p>
      * The use of this value is up to the implementation of the AbstractMnemosyneCache.
      * <p>
