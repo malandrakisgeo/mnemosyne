@@ -25,11 +25,12 @@ public abstract class AbstractGenericCache<K, ID, V> extends AbstractMnemosyneCa
     final boolean handleCollectionKeysSeparately;
     final boolean returnsCollection;
 
+    static final int MAX_MAP_SIZE = 1 << 30  - 1;
 
     public AbstractGenericCache(CacheParameters parameters, ValuePool<ID, V> valuePool) {
         super(parameters, valuePool, new ConcurrentHashMap<K, IdWrapper<ID>>());
         this.valuePool = valuePool;
-        this.totalCapacity = (parameters.getCapacity() <= 0 ? Integer.MAX_VALUE : parameters.getCapacity());
+        this.totalCapacity = (parameters.getCapacity() <= 0 ? MAX_MAP_SIZE : parameters.getCapacity()); //Hashmap's default total capacity
         this.timeToLive = (parameters.getTimeToLive() <= 0 ? Long.MAX_VALUE : parameters.getTimeToLive());
         this.invalidationInterval = (parameters.getInvalidationInterval() < 0 ? Long.MAX_VALUE : parameters.getInvalidationInterval());
         this.name = parameters.getCacheName();
