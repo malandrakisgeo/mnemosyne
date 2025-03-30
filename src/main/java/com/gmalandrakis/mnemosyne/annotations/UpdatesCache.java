@@ -98,7 +98,7 @@ public @interface UpdatesCache {
      * Example:
      * <pre>
      *       {@code
-     *       @UpdatesCache(name="getActiveUsers", addOnCondition={"isActivated", "isVerified"}, removeOnCondition={"!isActivated"})
+     *       @UpdatesCache(name="getActiveUsers", addOnCondition={"isActive", "isVerified"}, removeOnCondition={"!isActive"})
      *       public void saveUserDetails(@UpdatedValue User newUser)
      *       }
      *       </pre>

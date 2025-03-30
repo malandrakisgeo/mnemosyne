@@ -4,6 +4,8 @@ import com.gmalandrakis.mnemosyne.core.ValuePool;
 import com.gmalandrakis.mnemosyne.structures.CacheParameters;
 import org.junit.Test;
 
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import static org.junit.Assert.assertEquals;
@@ -17,17 +19,142 @@ public class LRUCacheTest {
     @Test
     public void testLRUCacheEviction() {
         CacheParameters params = new CacheParameters();
-        params.setCapacity(2);
+        params.setCapacity(3);
         ValuePool<Integer, String> val = new ValuePool<>();
-        LRUCache<Integer, Integer, String> cache = new LRUCache<>(params, val);
+        ProperLRUCache<Integer, Integer, String> cache = new ProperLRUCache<>(params, val);
         cache.put(1, 1, "Value1");
-        cache.put(2,2, "Value2");
-        cache.put(3, 3,"Value3"); // This should trigger eviction
+        cache.put(2, 2, "Value2");
+        cache.put(3, 3, "Value3");
+        cache.put(4, 4, "Value4"); // This should trigger eviction
 
         assertNull(cache.get(1)); // Evicted
         assertEquals("Value2", cache.get(2)); // Still in cache
         assertEquals("Value3", cache.get(3)); // Newly added
-        assert(val.getNumberOfUsesForId(1) == 0);
+        assertEquals("Value4", cache.get(4)); // Newly added
+        assert (val.getNumberOfUsesForId(1) == 0);
+
+
+        cache.invalidateCache();
+        cache.put(1, 1, "Value1");
+        cache.put(2, 2, "Value2");
+        cache.put(3, 3, "Value3");
+        cache.get(1); //Requested!
+        cache.put(4, 4, "Value4"); // This should trigger eviction
+
+        assertNull(cache.get(2)); // Evicted
+        assertEquals("Value1", cache.get(1)); // Requested, still in cache
+        assertEquals("Value3", cache.get(3)); // Newly added
+        assertEquals("Value4", cache.get(4)); // Newly added
+        assert (val.getNumberOfUsesForId(1) == 1);
+    }
+
+    @Test
+    public void testLRUCacheEvictions() {
+        CacheParameters params = new CacheParameters();
+        ValuePool<Integer, String> val = new ValuePool<>();
+        LRUCache<Integer, Integer, testObject> cache = new LRUCache<>(params, val);
+
+        var time = System.currentTimeMillis();
+
+        for (int j = 0; j <= 50000; ++j) {
+            var obj = new testObject();
+            obj.id = String.valueOf(j);
+            obj.name = "TEST TESTSSON" + j;
+            cache.put(j, j, obj);
+        }
+        System.out.println(System.currentTimeMillis()-time);
+        time = System.currentTimeMillis();
+        ProperLRUCache<Integer, Integer, testObject> cache2 = new ProperLRUCache<>(params, val);
+        for (int j = 0; j <= 50000; ++j) {
+            var obj = new testObject();
+            obj.id = String.valueOf(j);
+            obj.name = "TEST TESTSSON" + j;
+            cache2.put(j, j, obj);
+        }
+        System.out.println(System.currentTimeMillis()-time);
+
+    }
+
+    @Test
+    public void testLinkedList() {
+        List<testObject> linkedList = new LinkedList<testObject>();
+
+        var objj = new testObject();
+        objj.id = String.valueOf("-1");
+        objj.name = "TEST ";
+        linkedList.add(objj);
+
+        var time = System.currentTimeMillis();
+        var result = linkedList.contains(objj);
+        System.out.println(System.currentTimeMillis()-time);
+        System.out.println(result);
+
+        for (int j = 0; j <= 12000000; ++j) {
+            var obj = new testObject();
+            obj.id = String.valueOf(j);
+            obj.name = "TEST TESTSSON" + j;
+            linkedList.add(obj);
+        }
+        time = System.currentTimeMillis();
+        var objjj = new testObject();
+
+        objjj.id = String.valueOf(588);
+        objjj.name = "TEST TESTSSO N"+"-588";
+        result = linkedList.contains(objjj);
+        System.out.println(System.currentTimeMillis()-time);
+        System.out.println(result);
+
+
+    }
+
+    @Test
+    public void testConcurrent() {
+        LinkedHashMap<testObject, Integer> linkedList = new LinkedHashMap<testObject, Integer>();
+
+        var objj = new testObject();
+        objj.id = String.valueOf("-1");
+        objj.name = "TEST ";
+        linkedList.put(objj, linkedList.size());
+
+        var time = System.currentTimeMillis();
+        var result = linkedList.containsKey(objj);
+        System.out.println(System.currentTimeMillis()-time);
+        System.out.println(result);
+
+        for (int j = 0; j <= 12000000; ++j) {
+            var obj = new testObject();
+            obj.id = String.valueOf(j);
+            obj.name = "TEST TESTSSON" + j;
+            linkedList.put(objj, linkedList.size());
+        }
+        time = System.currentTimeMillis();
+        var objjj = new testObject();
+
+        objjj.id = String.valueOf(588);
+        objjj.name = "TEST TESTSSO N"+"-588";
+        result = linkedList.containsKey(objjj);
+        System.out.println(System.currentTimeMillis()-time);
+        System.out.println(result);
+
+
+    }
+
+    class testObject {
+        String id;
+        String name;
+        String email;
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof FIFOTest.testObject object)) return false;
+            return Objects.equals(id, object.id) && Objects.equals(name, object.name) && Objects.equals(email, object.email);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(id, name, email);
+        }
     }
 
   /*  @Test

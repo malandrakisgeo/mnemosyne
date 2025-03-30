@@ -4,7 +4,6 @@ import com.gmalandrakis.mnemosyne.core.ValuePool;
 import com.gmalandrakis.mnemosyne.exception.MnemosyneRetrievalException;
 import com.gmalandrakis.mnemosyne.structures.CacheParameters;
 import com.gmalandrakis.mnemosyne.structures.CollectionIdWrapper;
-import com.gmalandrakis.mnemosyne.structures.IdWrapper;
 import com.gmalandrakis.mnemosyne.structures.SingleIdWrapper;
 
 import java.util.*;

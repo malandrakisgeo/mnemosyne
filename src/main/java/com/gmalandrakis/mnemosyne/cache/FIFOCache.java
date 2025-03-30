@@ -148,7 +148,11 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
     public Collection<T> getAll(Collection<K> key) {
         var all = new ArrayList<T>();
         for (K k : key) {
-            all.add(this.get(k));
+            if (returnsCollection) {
+                all.addAll(this.getAll(k)); //TODO: UnitTest
+            } else {
+                all.add(this.get(k));
+            }
         }
         return all;
     }

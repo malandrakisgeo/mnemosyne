@@ -21,12 +21,12 @@ import java.util.concurrent.ConcurrentMap;
 public abstract class AbstractMnemosyneCache<K, ID, V> {
     /**
      * A map from the keys to the related ID values along with key-specific metadata.
-     * This should be a ConcurrentMap in order for mnemosyne to properly work in a multithreaded application.
+     * This should be a ConcurrentMap or externally synchronized Map in order for mnemosyne to properly work in a multithreaded application.
      * <p>
      * The IdWrapper can be either implementation, depending on whether the cache is expected to return whole collections for
      * a key or single values.
      */
-    ConcurrentMap<K, IdWrapper<ID>> keyIdMapper;
+    Map<K, IdWrapper<ID>> keyIdMapper;
 
     /**
      * The ValuePool containing the mapping between IDs and values.
@@ -140,7 +140,7 @@ public abstract class AbstractMnemosyneCache<K, ID, V> {
      */
     public abstract boolean idUsedAlready(ID id);
 
-    public ConcurrentMap<K, IdWrapper<ID>> getKeyIdMapper() {
+    public Map<K, IdWrapper<ID>> getKeyIdMapper() {
         return keyIdMapper;
     }
 
