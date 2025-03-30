@@ -5,11 +5,11 @@ import com.gmalandrakis.mnemosyne.structures.CacheParameters;
 import org.junit.Test;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
+import static org.junit.Assert.*;
 
 public class LRUCacheTest {
     /*
@@ -21,7 +21,7 @@ public class LRUCacheTest {
         CacheParameters params = new CacheParameters();
         params.setCapacity(3);
         ValuePool<Integer, String> val = new ValuePool<>();
-        ProperLRUCache<Integer, Integer, String> cache = new ProperLRUCache<>(params, val);
+        LRUCache<Integer, Integer, String> cache = new LRUCache<>(params, val);
         cache.put(1, 1, "Value1");
         cache.put(2, 2, "Value2");
         cache.put(3, 3, "Value3");
@@ -48,11 +48,11 @@ public class LRUCacheTest {
         assert (val.getNumberOfUsesForId(1) == 1);
     }
 
-    @Test
+    /*@Test
     public void testLRUCacheEvictions() {
         CacheParameters params = new CacheParameters();
         ValuePool<Integer, String> val = new ValuePool<>();
-        LRUCache<Integer, Integer, testObject> cache = new LRUCache<>(params, val);
+        LRUCacheOld<Integer, Integer, testObject> cache = new LRUCacheOld<>(params, val);
 
         var time = System.currentTimeMillis();
 
@@ -64,7 +64,7 @@ public class LRUCacheTest {
         }
         System.out.println(System.currentTimeMillis()-time);
         time = System.currentTimeMillis();
-        ProperLRUCache<Integer, Integer, testObject> cache2 = new ProperLRUCache<>(params, val);
+        LRUCache<Integer, Integer, testObject> cache2 = new LRUCache<>(params, val);
         for (int j = 0; j <= 50000; ++j) {
             var obj = new testObject();
             obj.id = String.valueOf(j);
@@ -73,71 +73,9 @@ public class LRUCacheTest {
         }
         System.out.println(System.currentTimeMillis()-time);
 
-    }
-
-    @Test
-    public void testLinkedList() {
-        List<testObject> linkedList = new LinkedList<testObject>();
-
-        var objj = new testObject();
-        objj.id = String.valueOf("-1");
-        objj.name = "TEST ";
-        linkedList.add(objj);
-
-        var time = System.currentTimeMillis();
-        var result = linkedList.contains(objj);
-        System.out.println(System.currentTimeMillis()-time);
-        System.out.println(result);
-
-        for (int j = 0; j <= 12000000; ++j) {
-            var obj = new testObject();
-            obj.id = String.valueOf(j);
-            obj.name = "TEST TESTSSON" + j;
-            linkedList.add(obj);
-        }
-        time = System.currentTimeMillis();
-        var objjj = new testObject();
-
-        objjj.id = String.valueOf(588);
-        objjj.name = "TEST TESTSSO N"+"-588";
-        result = linkedList.contains(objjj);
-        System.out.println(System.currentTimeMillis()-time);
-        System.out.println(result);
+    }*/
 
 
-    }
-
-    @Test
-    public void testConcurrent() {
-        LinkedHashMap<testObject, Integer> linkedList = new LinkedHashMap<testObject, Integer>();
-
-        var objj = new testObject();
-        objj.id = String.valueOf("-1");
-        objj.name = "TEST ";
-        linkedList.put(objj, linkedList.size());
-
-        var time = System.currentTimeMillis();
-        var result = linkedList.containsKey(objj);
-        System.out.println(System.currentTimeMillis()-time);
-        System.out.println(result);
-
-        for (int j = 0; j <= 12000000; ++j) {
-            var obj = new testObject();
-            obj.id = String.valueOf(j);
-            obj.name = "TEST TESTSSON" + j;
-            linkedList.put(objj, linkedList.size());
-        }
-        time = System.currentTimeMillis();
-        var objjj = new testObject();
-
-        objjj.id = String.valueOf(588);
-        objjj.name = "TEST TESTSSO N"+"-588";
-        result = linkedList.containsKey(objjj);
-        System.out.println(System.currentTimeMillis()-time);
-        System.out.println(result);
-
-
-    }
 
     class testObject {
         String id;
@@ -157,11 +95,14 @@ public class LRUCacheTest {
         }
     }
 
-  /*  @Test
+    @Test
     public void testLRUCacheRemove() {
-        LRUCache<Integer, String> cache = new LRUCache<>(new CacheParameters());
-        cache.put(1, "Value1");
-        cache.put(2, "Value2");
+        ValuePool<Integer, String> val = new ValuePool<>();
+
+        LRUCache<Integer, Integer, String> cache = new LRUCache<>(new CacheParameters(), val);
+
+        cache.put(1, 1,"Value1");
+        cache.put(2, 2,"Value2");
         cache.remove(1);
 
         assertNull(cache.get(1));
@@ -171,34 +112,32 @@ public class LRUCacheTest {
     @Test
     public void testLRUCacheExpirationAndInternalThreads() {
         CacheParameters params = new CacheParameters();
-        params.setTimeToLive(300);
+        params.setTimeToLive(200);
         params.setCapacity(10);
         params.setPreemptiveEvictionPercentage((short) 100);
-        LRUCache<Integer, String> cache = new LRUCache<>(params);
-        cache.put(1, "Value1");
-        cache.put(2, "Value2");
-        cache.put(4, "Value552");
-        cache.put(5, "Valute2");
-        cache.put(6, "Value2");
+        ValuePool<Integer, String> val = new ValuePool<>();
+
+        LRUCache<Integer, Integer, String> cache = new LRUCache<>(params, val);
+        cache.put(1, 1,"Value1");
+        cache.put(2,2, "Value2");
 
         try {
-            Thread.sleep(500); //Value1 and Value2 will have been expired by the end of this.
+            Thread.sleep(300); //Value1 and Value2 will have been expired by the end of this.
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-        cache.put(3, "Value3");
-
-        //verify(cache, atLeast(1)).evict();
+        cache.put(3,3, "Value3");
 
         assertNull(cache.get(1));
-
         assertNull(cache.get(2));
         assertNotNull(cache.get(3));
     }
 
     @Test
     public void testLRUCacheConcurrency() throws InterruptedException {
-        final LRUCache<Integer, String> cache = new LRUCache<>(new CacheParameters());
+        ValuePool<Integer, String> val = new ValuePool<>();
+        final LRUCache<Integer, Integer, String> cache = new LRUCache<>(new CacheParameters(), val);
+
         final int numThreads = 10;
         final int numOperationsPerThread = 100;
 
@@ -208,7 +147,7 @@ public class LRUCacheTest {
             executorService.submit(() -> {
                 for (int j = 0; j < numOperationsPerThread; j++) {
                     int key = (int) (Math.random() * 10);
-                    cache.put(key, "Value" + key);
+                    cache.put(key, key,"Value" + key);
                     cache.get(key);
                     cache.remove(key);
                 }
@@ -219,7 +158,7 @@ public class LRUCacheTest {
         executorService.awaitTermination(5, TimeUnit.SECONDS);
 
         // Check that the cache is empty after all threads finish
-        assertEquals(0, cache.cachedValues.size());
-    }*/
+        assertEquals(0, cache.getKeyIdMapper().size());
+    }
 }
 
