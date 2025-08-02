@@ -1,21 +1,39 @@
-### The project is under development and testing as of 3/2025.
+### The project is under development and testing as of 8/2025.
 
 # Mnemosyne
 Mnemosyne is a small and customizable cache library for Java applications.
-
-It enables multiple caches that return the same object types to use a common Value Pool where the returned
-values are mapped to particular IDs, thereby allowing for more efficient memory management and 
+It uses an in-memory database of values and their respective IDs for every cached type.
+This allows the simultaneous update of multiple caches at once, thereby allowing for more efficient memory management and 
 easier updates.
 
-It allows the developer to implement custom caching algorithms by simply extending an abstract class. 
+Mnemosyne allows the developer to implement domain-specific caching algorithms by simply extending an abstract class. 
 By default, mnemosyne includes implementations of FIFO and LRU.
 
 Mnemosyne currently works with Spring, but more integrations are coming.
 
+## Basic idea
+The basic idea is that, when multiple Java Methods that return the same object type need to be cached, it should be possible to update
+their caches at once. In the vast majority of the cases, one can assign a unique ID to a cached object,
+and that ID can then be used for simultaneous updates of multiple caches.
+
+Mnemosyne is designed with this in mind.
+
+Whenever an application calls a Method cached by mnemosyne, the arguments are assembled to a Key. The Key is then used
+to retrieve from a local mnemosyne cache the IDs of the objects to be returned. These objects are then searched for in a common
+Value Pool for the object type.
+
+The basic structure of mnemosyne is easy to understand with a practical example: an application that caches transactions.
+
+![Mnemosyne structure](structure-by-example.png?raw=true)
+
+
+If an object with a particular ID is updated, it is updated in the Value Pool and hence updated for all caches at once.
+One can update or remove objects with domain-specific logic (e.g, remove a transaction from a cached list if it is cancelled, otherwise update).
+
 
 ## What problem does mnemosyne solve?
 
-Let's say we work on a Java class with methods like this:
+Suppose we work with multiple Methods that return instances or collections of the same type (e.g. Transaction):
 
     Transaction getTransactionById(UUID transactionId);
     List<Transaction> getTransactionsBySeller(String username);
@@ -24,9 +42,9 @@ Let's say we work on a Java class with methods like this:
     List<Transaction> getPendingTransactions();
     List<Transaction> getTransactionByIds(Set<UUID> transactionIds); 
 
-and other methods that add transactions or update them.
+and other methods that add objects or update them.
 
-Suppose we need to run such methods extremely often, and we need fetch the transactions from a very slow remote database or REST-service,
+Suppose we need to run such methods extremely often, and we need fetch the objects from a very slow remote database or REST-service,
 so we need to rely on a cache as much as possible.
 
 What happens if a transaction is updated, e.g. completed or cancelled?
@@ -115,9 +133,6 @@ the methods to be cached, as you see in the examples below:
     @Cached(cacheName = "transactionCache", capacity = 5000, timeToLive = 24 * 3600 * 1000, countdownFromCreation = true, cacheType = FIFOCache.class)
     public Transaction getTransactionById(String id);
 
-    @Cached(cacheName = "customerCache2", capacity = 500)
-    public Customer doSomethingAndReturnACustomer(@Key String id, String irrelevantForCaching, Boolean irrelevantBoolean) ;
-
     @Cached(cacheName = "getTransactionsByIds", capacity = 10000, allowSeparateHandlingForKeyCollections = true)
     List<Transaction> getTransactionByIds(Set<UUID> transactionIds);
 
@@ -142,17 +157,17 @@ CompoundKey used to retrieve the actual cache values.
 
 ### Implementing custom caching algorithms
 
-As of 3/2025 a generic implementation of a FIFO and an LRU are provided by mnemosyne. An S3-FIFO and an LFU are under construction.
+As of 8/2025 a generic implementation of a FIFO and an LRU are provided by mnemosyne. An S3-FIFO and an LFU are under construction.
 But since many projects have domain-specific needs and eviction policies, users are able to implement their own caching algorithms
 by extending the AbstractMnemosyneCache class and implementing its' abstract methods.
 
-AbstractMnemosyneCache provides a specification of what does mnemosyne expect a caching algorithm to look like in order to function.
+AbstractMnemosyneCache provides a specification of what mnemosyne expects from a caching algorithm in order to function.
 Any cache algorithm following this specification should be able to work with mnemosyne without problems.
 
 ### Precautions
 
 #### Proxy objects
-As of 3/2025, mnemosyne's default caching algorithms may not work properly with proxy objects.
+As of 8/2025, mnemosyne's default caching algorithms may not work properly with proxy objects.
 
 Many frameworks and libraries for databases or REST- and SOAP-based services, wrap the returned values in proxy objects
 that often lack a particular ID. There is a TODO on enabling support for enabling custom ID deduction, but
@@ -162,7 +177,7 @@ Deactivating proxy objects differs from framework to framework, (e.g. in Hiberna
 Please check the documentation of the framework/library you use.
 
 #### Collections as keys
-As of 3/2025, methods that take a Collection as an argument will work properly only if they are an abstract Collection, Set, or List.
+As of 8/2025, methods that take a Collection as an argument will work properly only if they are an abstract Collection, Set, or List.
 Using a concrete subclass, like e.g. ArrayList or HashSet, is explicitly forbidden in case you want to use special collection handling and will result to a RuntimeException.
 
 When no special collection handling is enabled, though the use of e.g. ArrayLists is not forbidden, it may result to update discrepancies if another method updates the cached one via an @UpdatesCache annotation: the objects being updates via an @UpdatesCache annotation
@@ -175,7 +190,7 @@ To understand why, consider the following use case: a method returning all the t
 (a seller is most likely associated with more than one transaction). Calling the method with the list with the values "seller1" and "seller2" 
 returns a different result than calling it with a "seller1", "seller3". If you cache this method, nothing particularly bad will happen: 
 mnemosyne will just fetch the data for "seller1" twice. 
-But if you proceed to updating the method via an @UpdatesCache annotation, as of 3/2025, you will get cache discrepancies.
+But if you proceed to updating the method via an @UpdatesCache annotation, as of 8/2025, you will get cache discrepancies.
 It would be more prudent to cache an underlying method that takes each sellerId one by one and yields a result, especially if you want to update the cache.
 
     public List<Transaction> getTransactionsBySellersDoneRight(List<String> sellers){
@@ -218,5 +233,5 @@ You may find some in the issues too.
 * Add support for records
 
 ## Further documentation
-As of 3/2025, the documentation is provided in the code itself as javadoc.
+As of 8 /2025, the documentation is provided in the code itself as javadoc.
 Running mvn javadoc:javadoc should suffice to generate a webpage with a general description.
