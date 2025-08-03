@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
 @SuppressWarnings({"unchecked", "raw"})
 public class MnemoProxy<K, ID, V> {
 
-    private final AbstractMnemosyneCache<K, ID, V> cache;
+    protected final AbstractMnemosyneCache<K, ID, V> cache;
 
     private final boolean returnsCollections;
 
@@ -96,7 +96,7 @@ public class MnemoProxy<K, ID, V> {
                     idValueMap.keySet().forEach(id -> cache.removeOneFromCollection(key, id));
                     return;
                 } else if (removeMode.equals(RemoveMode.REMOVE_VALUE_FROM_ALL_COLLECTIONS)) {
-                    idValueMap.keySet().forEach(cache::removeFromAllCollections); //o prwtos pou tha mou steilei email gia auto to sxolio lamvanei pente evrw.
+                    idValueMap.keySet().forEach(cache::removeById); //o prwtos pou tha mou steilei email gia auto to sxolio lamvanei pente evrw.
                     return;
                 }
             }
@@ -201,7 +201,7 @@ public class MnemoProxy<K, ID, V> {
         var compoundKeys = (Collection<K>) keys.stream().map(k -> GeneralUtils.deduceCompoundKeyFromMethodAndArgs(this.cachedMethod, new Object[]{k})).toList(); //we need therefore to wrap each key around a compoundKey, because that is what we do everywhere else, and it will otherwise lead to a bug: a CompoundKey(value) is never equal to (value)
         var resultCollection = cache.getAll(compoundKeys);
         if (resultCollection == null || resultCollection.isEmpty() || resultCollection.size() < keys.size() || resultCollection.contains(null)) {
-            return null; //We don't know which key did not have a cached value. So we return null, and do the separate handling afterwards.
+            return null; //We don't know which key(s) did not have a cached value. So we return null, and do the separate handling afterwards.
         }
         return resultCollection;
     }

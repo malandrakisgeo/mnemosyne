@@ -12,23 +12,25 @@ By default, mnemosyne includes implementations of FIFO and LRU.
 Mnemosyne currently works with Spring, but more integrations are coming.
 
 ## Basic idea
-The basic idea is that, when multiple Java Methods that return the same object type need to be cached, it should be possible to update
-their caches at once. In the vast majority of the cases, one can assign a unique ID to a cached object,
-and that ID can then be used for simultaneous updates of multiple caches.
+The basic idea is that, when multiple Java Methods returning the same object type are cached, it should be possible to update
+their caches at once. One can assign a unique ID to a cached object, and that ID can then be used for simultaneous updates of multiple caches.
 
-Mnemosyne is designed with this in mind.
-
-Whenever an application calls a Method cached by mnemosyne, the arguments are assembled to a Key. The Key is then used
-to retrieve from a local mnemosyne cache the IDs of the objects to be returned. These objects are then searched for in a common
-Value Pool for the object type.
+The objects may be returned from a cache as they are, or as collection elements. Some caches may be subject to conditional updates.
+Mnemosyne is designed with these considerations in mind.
 
 The basic structure of mnemosyne is easy to understand with a practical example: an application that caches transactions.
 
 ![Mnemosyne structure](structure-by-example.png?raw=true)
 
+When an application calls a Method cached by mnemosyne, the arguments are assembled to a CompoundKey. The CompoundKey is then used
+to retrieve from a local mnemosyne cache the IDs of the objects to be returned. These objects are stored in a common
+Value Pool for the object type, mapped to their IDs.
+
+When an application calls a Method that updates an object of a cached type, the operation is propagated to the Value Pool,
+effectively updating all caches at once with the latest version of an object. Local caches may have values
+added or removed on conditions.
 
 If an object with a particular ID is updated, it is updated in the Value Pool and hence updated for all caches at once.
-One can update or remove objects with domain-specific logic (e.g, remove a transaction from a cached list if it is cancelled, otherwise update).
 
 
 ## What problem does mnemosyne solve?
@@ -150,6 +152,9 @@ the methods to be cached, as you see in the examples below:
     @UpdatesCache(name="getPendingTransactionsByUser", removeMode = RemoveMode.REMOVE_VALUE_FROM_COLLECTION, addMode = AddMode.ADD_VALUES_TO_COLLECTION, 
     removeOnCondition="!transaction.isCompleted", addOnCondition="transaction.isCompleted", targetObjectKeys="userId")
     public void saveTransaction(@UpdatedValue Transaction transaction);
+
+    @UpdatesValuePool(remove = true)
+    public void deleteTransaction(Transaction transaction);
 
 
 Unless otherwise indicated by the presence of a @com.gmalandrakis.mnemosyne.annotations.Key annotation, all arguments are assembled to a 

@@ -181,7 +181,7 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
             return;
         }
         if (key == null) {
-            removeFromAllCollections(id);
+            removeById(id);
         } else {
             var cacheData = (CollectionIdWrapper) keyIdMapper.get(key);
             if (cacheData == null) {
@@ -194,19 +194,27 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
     }
 
     @Override
-    public void removeFromAllCollections(ID id) {
+    public void removeById(ID id) {
+        var relatedKeys = new HashSet<K>();
         if (!returnsCollection) {
-            return;
-        }
-        var relatedKeys = new HashSet<>();
-        for (K k : keyIdMapper.keySet()) {
-            var deleted = ((CollectionIdWrapper) keyIdMapper.get(k)).getIds().remove(id);
-            if (deleted) {
-                relatedKeys.add(k);
-                removeOrDecreaseIdUses(id);
+            for (K k : keyIdMapper.keySet()) {
+                if(((SingleIdWrapper) k).getId().equals(id)){
+                    relatedKeys.add(k);
+                    removeOrDecreaseIdUses(id);
+                }
+            }
+        } else{
+            for (K k : keyIdMapper.keySet()) {
+                var deleted = ((CollectionIdWrapper) k).getIds().remove(id);
+                if (deleted) {
+                    relatedKeys.add(k);
+                    removeOrDecreaseIdUses(id);
+                }
             }
         }
-        if (handleCollectionKeysSeparately) { //on special collection handling, a key corresponds to at most one ID
+
+
+        if (handleCollectionKeysSeparately || !returnsCollection) { //on special collection handling, a key corresponds to at most one ID
             relatedKeys.forEach(k -> {
                 keyIdMapper.remove(k);
                 concurrentFIFOQueue.remove(k);

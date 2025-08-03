@@ -1,6 +1,7 @@
 package com.gmalandrakis.mnemosyne.spring;
 
 import com.gmalandrakis.mnemosyne.annotations.Cached;
+import com.gmalandrakis.mnemosyne.annotations.UpdatesValuePool;
 import com.gmalandrakis.mnemosyne.core.MnemoService;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
@@ -27,6 +28,8 @@ public class SpringInterceptor implements MethodInterceptor {
 
         if (method.getAnnotation(Cached.class) != null) {
             return mnemoService.fetchFromCacheOrInvokeMethodAndUpdate(method, args);
+        } else if(method.getAnnotation(UpdatesValuePool.class) != null){
+            return mnemoService.invokeMethodAndUpdateValuePool(method, targetObject, args);
         } else {
             return mnemoService.invokeMethodAndUpdate(method, targetObject, args);
         }

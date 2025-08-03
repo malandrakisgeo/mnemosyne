@@ -36,6 +36,12 @@ public class ValuePool<ID, T> {
         return list;
     }
 
+    /**
+     * Stores a new value in memory.
+     * @param id: The ID of the value
+     * @param value: The value itself
+     * @param newCache: Set to true if the calling cache did not include the value before.
+     */
     public void put(ID id, T value, boolean newCache) {
         var cachedValue = this.valueMap.get(id);
         if (cachedValue == null)
@@ -48,15 +54,25 @@ public class ValuePool<ID, T> {
         }
     }
 
+    public void increaseNumberOfUsesForId(ID id, T value) {
+        var cachedValue = this.valueMap.get(id);
+        if (cachedValue == null)
+            this.valueMap.put(id, new CacheValue<>(value)); //TODO: Can lead to memory leaks if no active cache uses the value
+        else {
+            cachedValue.increaseNumberOfUses();
+        }
+    }
+
     public Integer removeOrDecreaseNumberOfUsesForId(ID id) {
         var cachedValue = valueMap.get(id);
         if (cachedValue == null) {
             return 0;
         }
-        if (cachedValue.decreaseNumberOfUses() == 0) {
+        var newNumberOfUses = cachedValue.decreaseNumberOfUses();
+        if (newNumberOfUses == 0) {
             valueMap.remove(id);
         }
-        return cachedValue.getNumberOfUses();
+        return newNumberOfUses;
     }
 
     public int getSize() {
