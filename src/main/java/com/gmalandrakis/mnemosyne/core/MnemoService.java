@@ -43,7 +43,7 @@ public class MnemoService {
         } catch (IllegalAccessException | InvocationTargetException e) {
             throw new RuntimeException(e);
         }
-        updateValuePool(method, object, false, false, args);
+        updateValuePool(method, object, false, false, args); //TODO: Fetch the actual values
         return object;
     }
 
@@ -54,10 +54,9 @@ public class MnemoService {
         } catch (IllegalAccessException | InvocationTargetException e) {
             throw new RuntimeException(e);
         }
-        Object finalObject = object;
-        // threadPool.execute(() -> {
-        updateRelatedCaches(method, finalObject, args); //TODO: Decide whether this should run in threadPool.execute to avoid delays
-        //}); //we don't want the updates to delay returning
+        updateValuePool(method, object, false, false, args);
+        //TODO: Decide whether this should run in threadPool.execute to avoid delays
+        updateRelatedCaches(method, object, args);
         return object;
     }
 
@@ -67,39 +66,35 @@ public class MnemoService {
         Object result = tryFetchFromCache(cacheProxy, args);
         if (result == null) {
             result = cacheProxy.getFromUnderlyingMethodAndUpdateMainCache(args);
-            final var threadResult = result;
-            //threadPool.execute(() -> { //We want to update all related caches, without delaying returning
-            updateRelatedCaches(method, threadResult, args); // //TODO: Decide whether this should run in threadPool.execute to avoid delays
-            // });
+            updateValuePool(method, result, false, false, args);
+            updateRelatedCaches(method, result, args);
         }
         return result;
     }
 
     public void updateRelatedCaches(Method method, Object possibleUpdatedValue, Object... args) {
         var updatesCaches = method.getAnnotation(UpdatesCaches.class);
-
         if (updatesCaches != null) {
             for (UpdatesCache updateCache : updatesCaches.value()) {
-                this.updateRelatedCache(updateCache, method, possibleUpdatedValue, args);
+                this.updateRelatedCache(updateCache, method.getParameterAnnotations(), possibleUpdatedValue, args);
             }
-            return;
         }
         var updateCache = method.getAnnotation(UpdatesCache.class);
         if (updateCache != null) {
-            this.updateRelatedCache(updateCache, method, possibleUpdatedValue, args);
+            this.updateRelatedCache(updateCache, method.getParameterAnnotations(), possibleUpdatedValue, args);
         }
     }
 
     //TODO: Simplify the flow here
-    private void updateRelatedCache(UpdatesCache updateCache, Method invokedMethod, Object possibleUpdatedValue, Object... args) {
-        Object updatedValue = getAnnotatedUpdatedValue(invokedMethod, args); // check if any of the args is annotated as @UpdatedValue.
+    private void updateRelatedCache(UpdatesCache updateCache, Annotation[][] methodParameterAnnotations, Object possibleUpdatedValue, Object... args) {
+        Object updatedValue = getAnnotatedUpdatedValue(methodParameterAnnotations, args); // check if any of the args is annotated as @UpdatedValue.
 
         if (updatedValue == null) {
             updatedValue = possibleUpdatedValue; // Which means that if there is any @UpdatedValue in the arguments, the result of the method is not used for updates!.
         }
 
         var idOfUpdatedValue = GeneralUtils.deduceId(updatedValue);
-         //final Object finalUpdatedValue = updatedValue;
+        //final Object finalUpdatedValue = updatedValue;
 
         var cacheToBeUpdated = this.cachesByName.get(updateCache.name());
 
@@ -108,7 +103,7 @@ public class MnemoService {
 
         var targetObjectKeyNamesAndValues = updateCache.targetObjectKeys();
         var targetKeyNamesAndValues = linkTargetObjectKeysToObjects(List.of(targetObjectKeyNamesAndValues), updatedValue);
-        var annotatedKeyNamesAndValues = getUpdateKeyNamesAndCorrespondingValues(invokedMethod, updateCache.annotatedKeys(), args);
+        var annotatedKeyNamesAndValues = getUpdateKeyNamesAndCorrespondingValues(methodParameterAnnotations, updateCache.annotatedKeys(), args);
 
         var conditionalRemoval = getCondition(updateCache.removeOnCondition(), annotatedKeyNamesAndValues, updatedValue, updateCache.conditionalANDGate());
         var conditionalAdd = getCondition(updateCache.addOnCondition(), annotatedKeyNamesAndValues, updatedValue, updateCache.conditionalANDGate());
@@ -129,7 +124,7 @@ public class MnemoService {
     }
 
     private void updateValuePool(Method invokedMethod, Object possibleUpdatedValue, boolean remove, boolean addIfAbsent, Object... args) {
-        Object updatedValue = getAnnotatedUpdatedValue(invokedMethod, args); // check if any of the args is annotated as @UpdatedValue.
+        Object updatedValue = getAnnotatedUpdatedValue(invokedMethod.getParameterAnnotations(), args); // check if any of the args is annotated as @UpdatedValue.
 
         if (updatedValue == null) {
             updatedValue = possibleUpdatedValue; // Which means that if there is any @UpdatedValue in the arguments, the result of the method is not used for updates!.
@@ -138,14 +133,14 @@ public class MnemoService {
         var idOfUpdatedValue = GeneralUtils.deduceId(updatedValue);
         var vp = getValuePool(invokedMethod);
         if (remove) {
-            proxies.values().forEach(p -> p.cache.removeById(idOfUpdatedValue));
+            proxies.values().forEach(p -> p.cache.removeById(idOfUpdatedValue)); //will be removed from valuepool via the local caches, along with the ID from them.
             return;
         } else {
             if (addIfAbsent) {
-                //TODO
+                vp.put(idOfUpdatedValue, updatedValue, true);
                 return;
             }
-            vp.put(idOfUpdatedValue, updatedValue, false);
+            vp.updateIfExists(idOfUpdatedValue, updatedValue);
         }
 
     }
@@ -353,11 +348,11 @@ public class MnemoService {
     }
 
 
-    private Object getAnnotatedUpdatedValue(Method method, Object[] args) {
-        var paramannot = method.getParameterAnnotations();
+    private Object getAnnotatedUpdatedValue(Annotation[][] parameterAnnotations, Object[] args) {
+        // var paramannot = method.getParameterAnnotations();
 
         int i = 0;
-        for (Annotation[] annotations : paramannot) {
+        for (Annotation[] annotations : parameterAnnotations) {
             for (Annotation annotation : annotations) {
                 if (annotation.annotationType() == UpdatedValue.class) {
                     return args[i];
@@ -450,8 +445,7 @@ public class MnemoService {
         return new CompoundKey(keyObjects.toArray());
     }
 
-    private LinkedHashMap<String, Object> getUpdateKeyNamesAndCorrespondingValues(Method method, String[] keyNames, Object[] args) {
-        var parameterAnnotations = method.getParameterAnnotations();
+    private LinkedHashMap<String, Object> getUpdateKeyNamesAndCorrespondingValues(Annotation[][] parameterAnnotations, String[] keyNames, Object[] args) {
         var keyNameAndValue = new LinkedHashMap<String, Object>();
         int i = 0;
 

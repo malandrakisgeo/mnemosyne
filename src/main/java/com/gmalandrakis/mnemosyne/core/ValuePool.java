@@ -38,8 +38,9 @@ public class ValuePool<ID, T> {
 
     /**
      * Stores a new value in memory.
-     * @param id: The ID of the value
-     * @param value: The value itself
+     *
+     * @param id:       The ID of the value
+     * @param value:    The value itself
      * @param newCache: Set to true if the calling cache did not include the value before.
      */
     public void put(ID id, T value, boolean newCache) {
@@ -52,6 +53,12 @@ public class ValuePool<ID, T> {
                 cachedValue.increaseNumberOfUses();
             }
         }
+    }
+
+    public void updateIfExists(ID id, T value) {
+        var cachedValue = this.valueMap.get(id);
+        if (cachedValue != null)
+            cachedValue.updateValue(value);
     }
 
     public void increaseNumberOfUsesForId(ID id, T value) {

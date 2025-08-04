@@ -94,16 +94,15 @@ public class MnemoProxy<K, ID, V> {
             if (returnsCollections) {
                 if (removeMode.equals(RemoveMode.REMOVE_VALUE_FROM_COLLECTION)) {
                     idValueMap.keySet().forEach(id -> cache.removeOneFromCollection(key, id));
-                    return;
                 } else if (removeMode.equals(RemoveMode.REMOVE_VALUE_FROM_ALL_COLLECTIONS)) {
                     idValueMap.keySet().forEach(cache::removeById); //o prwtos pou tha mou steilei email gia auto to sxolio lamvanei pente evrw.
-                    return;
                 }
             }
 
             if (removeMode.equals(RemoveMode.INVALIDATE_CACHE)) {
                 cache.invalidateCache();
             }
+            return;
         }
     }
 
@@ -140,6 +139,7 @@ public class MnemoProxy<K, ID, V> {
                 cache.remove(key);
                 cache.putAll(key, idValueMap);
             }
+            return;
         }
     }
 
