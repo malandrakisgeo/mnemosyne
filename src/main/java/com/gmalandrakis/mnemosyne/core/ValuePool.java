@@ -54,12 +54,26 @@ public class ValuePool<ID, T> {
             }
         }
     }
-
-    public void updateIfExists(ID id, T value) {
+    public void put(ID id, boolean newCache) {
         var cachedValue = this.valueMap.get(id);
-        if (cachedValue != null)
-            cachedValue.updateValue(value);
+        if (cachedValue == null)
+            return; //TODO: perhaps throw?
+        else {
+            if (newCache) {
+                cachedValue.increaseNumberOfUses();
+            }
+        }
     }
+
+    public void updateValueOrPutPreemptively(ID id, T value) {
+        var cachedValue = this.valueMap.get(id);
+        if (cachedValue == null)
+            this.valueMap.put(id, new CacheValue<>(value, true));
+        else {
+            cachedValue.updateValue(value);
+        }
+    }
+
 
     public void increaseNumberOfUsesForId(ID id, T value) {
         var cachedValue = this.valueMap.get(id);

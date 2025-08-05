@@ -21,7 +21,7 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
     }
 
     @Override
-    public void putAll(K key, Map<ID, T> map) {
+    public void putAll(K key, Collection<ID> map) {
         if (key == null || map == null || !returnsCollection) {
             return;
         }
@@ -31,14 +31,14 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
         //We avoid iterative calls to put(), to avoid checking the keyIdMapper multiple times. One time suffices.
         synchronized (keyIdMapper) {
             var possibleValue = (CollectionIdWrapper<ID>) keyIdMapper.computeIfAbsent(key, k -> new CollectionIdWrapper<>());
-            possibleValue.addAllToCollectionOrUpdate(map.keySet());
+            possibleValue.addAllToCollectionOrUpdate(map);
         }
 
         map.forEach(this::addOrUpdateIdAndValue);
     }
 
     @Override
-    public void putInAllCollections(ID id, T value) {
+    public void putInAllCollections(ID id) {
         if (!returnsCollection || handleCollectionKeysSeparately) {
             return;
         }
@@ -52,11 +52,11 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
                 }
             }
         }
-        valuePool.put(id, value, initialNumOfUses == 0);
+        valuePool.put(id,  initialNumOfUses == 0);
     }
 
     @Override
-    public void put(K key, ID id, T value) {
+    public void put(K key, ID id) {
         if (key == null || id == null) {
             return;
         }
@@ -73,7 +73,7 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
                 if (idWrapper != null) {
                     var oldId = (ID) ((SingleIdWrapper) idWrapper).getId();
                     if (oldId.equals(id)) {
-                        valuePool.put(id, value, false); //just update the current value
+                        valuePool.put(id,  false); //just update the current value
                         return;
                     }
                     removeOrDecreaseIdUses(oldId);
@@ -81,7 +81,7 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
                 keyIdMapper.put(key, new SingleIdWrapper<ID>(id)); //if we used putIfAbsent, we would prevent the key from being updated with a brand new ID/value
             }
         }
-        addOrUpdateIdAndValue(id, value);
+        addOrUpdateIdAndValue(id);
 
     }
 
@@ -264,10 +264,10 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
         }
     }
 
-    private void addOrUpdateIdAndValue(ID id, T value) {
+    private void addOrUpdateIdAndValue(ID id) {
         var usesOfIdInCache = numberOfUsesById.getOrDefault(id, 0); //In non-collection caches, a key corresponds to just one object, but one object may be referenced to by many keys.
         var idAlreadyInCache = usesOfIdInCache > 0;
         numberOfUsesById.put(id, ++usesOfIdInCache);
-        valuePool.put(id, value, !idAlreadyInCache);
+        valuePool.put(id,  !idAlreadyInCache);
     }
 }

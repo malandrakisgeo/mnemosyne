@@ -52,14 +52,14 @@ public abstract class AbstractMnemosyneCache<K, ID, V> {
      * <p>
      * Implementations <b>must</b> call {@link com.gmalandrakis.mnemosyne.core.ValuePool#put ValuePool's put()}
      */
-    public abstract void put(K key, ID id, V value);
+    public abstract void put(K key, ID id);
 
     /**
      * Adds multiple values along with their IDs for a single key.
      * Should only be implemented for collection caches.     <p>
      * Implementations <b>must</b> call {@link com.gmalandrakis.mnemosyne.core.ValuePool#put ValuePool's put()}
      */
-    public abstract void putAll(K key, Map<ID, V> ídValueMap);
+    public abstract void putAll(K key, Collection<ID> ídValueMap);
 
     /**
      * Adds a particular ID in all available collection caches independently of the keys corresponding to them.
@@ -67,7 +67,7 @@ public abstract class AbstractMnemosyneCache<K, ID, V> {
      * <p>
      * Implementations <b>must</b> call {@link com.gmalandrakis.mnemosyne.core.ValuePool#put ValuePool's put()}
      **/
-    public abstract void putInAllCollections(ID id, V value);
+    public abstract void putInAllCollections(ID id);
 
     /**
      * For collection caches -i.e. caches where one key can correspond to multiple values.

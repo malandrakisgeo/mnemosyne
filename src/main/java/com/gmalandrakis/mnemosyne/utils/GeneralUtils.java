@@ -2,6 +2,7 @@ package com.gmalandrakis.mnemosyne.utils;
 
 import com.gmalandrakis.mnemosyne.annotations.Id;
 import com.gmalandrakis.mnemosyne.annotations.Key;
+import com.gmalandrakis.mnemosyne.annotations.UpdatedValue;
 import com.gmalandrakis.mnemosyne.structures.CompoundId;
 import com.gmalandrakis.mnemosyne.structures.CompoundKey;
 
@@ -15,6 +16,21 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class GeneralUtils {
+
+    public static Object getAnnotatedUpdatedValue(Annotation[][] parameterAnnotations, Object[] args) {
+        // var paramannot = method.getParameterAnnotations();
+
+        int i = 0;
+        for (Annotation[] annotations : parameterAnnotations) {
+            for (Annotation annotation : annotations) {
+                if (annotation.annotationType() == UpdatedValue.class) {
+                    return args[i];
+                }
+            }
+            i += 1;
+        }
+        return null;
+    }
 
     public static Object deduceId(Object object) {
         if (object == null) {

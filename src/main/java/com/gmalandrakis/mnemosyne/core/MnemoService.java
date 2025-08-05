@@ -18,6 +18,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
+import static com.gmalandrakis.mnemosyne.utils.GeneralUtils.getAnnotatedUpdatedValue;
 import static com.gmalandrakis.mnemosyne.utils.ParameterUtils.annotationValuesToCacheParameters;
 
 /**
@@ -43,7 +44,8 @@ public class MnemoService {
         } catch (IllegalAccessException | InvocationTargetException e) {
             throw new RuntimeException(e);
         }
-        updateValuePool(method, object, false, false, args); //TODO: Fetch the actual values
+        var id = GeneralUtils.deduceId(object);
+        updateValuePool(method, id, object, false, false, args); //TODO: Fetch the actual values
         return object;
     }
 
@@ -54,9 +56,15 @@ public class MnemoService {
         } catch (IllegalAccessException | InvocationTargetException e) {
             throw new RuntimeException(e);
         }
-        updateValuePool(method, object, false, false, args);
-        //TODO: Decide whether this should run in threadPool.execute to avoid delays
-        updateRelatedCaches(method, object, args);
+        Object updatedValue = getAnnotatedUpdatedValue(method.getParameterAnnotations(), args); // check if any of the args is annotated as @UpdatedValue.
+
+        if (updatedValue != null) {
+            object = updatedValue; // Which means that if there is any @UpdatedValue in the arguments, the result of the method is not used for updates!.
+        }
+        var id = GeneralUtils.deduceId(object);
+        updateValuePool(method,id, object, false, false, args);
+        updateRelatedCaches(method, id, object, args);
+
         return object;
     }
 
@@ -65,45 +73,45 @@ public class MnemoService {
         assert (cacheProxy != null);
         Object result = tryFetchFromCache(cacheProxy, args);
         if (result == null) {
-            result = cacheProxy.getFromUnderlyingMethodAndUpdateMainCache(args);
-            updateValuePool(method, result, false, false, args);
-            updateRelatedCaches(method, result, args);
+            var idValMap  = cacheProxy.getFromUnderlyingMethodAndUpdateMainCache(args);
+            threadPool.execute(()->{
+                idValMap.forEach((id, v)->{
+                    updateRelatedCaches(method, id ,v, args);
+                });
+            });
+            result = cacheProxy.deduce(idValMap);
         }
         return result;
     }
 
-    public void updateRelatedCaches(Method method, Object possibleUpdatedValue, Object... args) {
+
+    public void updateRelatedCaches(Method method, Object id, Object possibleUpdatedValue, Object... args) {
         var updatesCaches = method.getAnnotation(UpdatesCaches.class);
         if (updatesCaches != null) {
             for (UpdatesCache updateCache : updatesCaches.value()) {
-                this.updateRelatedCache(updateCache, method.getParameterAnnotations(), possibleUpdatedValue, args);
+                this.updateRelatedCache(updateCache, method.getParameterAnnotations(),id, possibleUpdatedValue, args);
             }
         }
         var updateCache = method.getAnnotation(UpdatesCache.class);
         if (updateCache != null) {
-            this.updateRelatedCache(updateCache, method.getParameterAnnotations(), possibleUpdatedValue, args);
+            this.updateRelatedCache(updateCache, method.getParameterAnnotations(),id, possibleUpdatedValue, args);
         }
     }
 
     //TODO: Simplify the flow here
-    private void updateRelatedCache(UpdatesCache updateCache, Annotation[][] methodParameterAnnotations, Object possibleUpdatedValue, Object... args) {
-        Object updatedValue = getAnnotatedUpdatedValue(methodParameterAnnotations, args); // check if any of the args is annotated as @UpdatedValue.
-
-        if (updatedValue == null) {
-            updatedValue = possibleUpdatedValue; // Which means that if there is any @UpdatedValue in the arguments, the result of the method is not used for updates!.
-        }
-
-        var idOfUpdatedValue = GeneralUtils.deduceId(updatedValue);
-        //final Object finalUpdatedValue = updatedValue;
-
+    private void updateRelatedCache(UpdatesCache updateCache, Annotation[][] methodParameterAnnotations, Object idOfUpdatedValue, Object updatedValue, Object... args) {
+        var targetObjectKeyNamesAndValues = updateCache.targetObjectKeys();
         var cacheToBeUpdated = this.cachesByName.get(updateCache.name());
 
         assert (cacheToBeUpdated != null);
         var cachedMethod = cacheToBeUpdated.getCachedMethod();
-
-        var targetObjectKeyNamesAndValues = updateCache.targetObjectKeys();
-        var targetKeyNamesAndValues = linkTargetObjectKeysToObjects(List.of(targetObjectKeyNamesAndValues), updatedValue);
         var annotatedKeyNamesAndValues = getUpdateKeyNamesAndCorrespondingValues(methodParameterAnnotations, updateCache.annotatedKeys(), args);
+
+
+        //final Object finalUpdatedValue = updatedValue;
+
+
+        var targetKeyNamesAndValues = linkTargetObjectKeysToObjects(List.of(targetObjectKeyNamesAndValues), updatedValue);
 
         var conditionalRemoval = getCondition(updateCache.removeOnCondition(), annotatedKeyNamesAndValues, updatedValue, updateCache.conditionalANDGate());
         var conditionalAdd = getCondition(updateCache.addOnCondition(), annotatedKeyNamesAndValues, updatedValue, updateCache.conditionalANDGate());
@@ -113,7 +121,7 @@ public class MnemoService {
             cacheToBeUpdated.updateByRemoving(key, null, conditionalRemoval, updateCache.removeMode());
             return;
         }
-        if (idOfUpdatedValue instanceof Map) {
+        if (idOfUpdatedValue instanceof Map) { //This should be impossible with this flow. Test and verify
             cacheToBeUpdated.updateByRemoving(key, (Map) idOfUpdatedValue, conditionalRemoval, updateCache.removeMode());
             cacheToBeUpdated.updateByAdding(key, (Map) idOfUpdatedValue, conditionalAdd, updateCache.addMode());
 
@@ -123,14 +131,10 @@ public class MnemoService {
         }
     }
 
-    private void updateValuePool(Method invokedMethod, Object possibleUpdatedValue, boolean remove, boolean addIfAbsent, Object... args) {
-        Object updatedValue = getAnnotatedUpdatedValue(invokedMethod.getParameterAnnotations(), args); // check if any of the args is annotated as @UpdatedValue.
-
-        if (updatedValue == null) {
-            updatedValue = possibleUpdatedValue; // Which means that if there is any @UpdatedValue in the arguments, the result of the method is not used for updates!.
+    private void updateValuePool(Method invokedMethod, Object idOfUpdatedValue, Object updatedValue, boolean remove, boolean addIfAbsent, Object... args) {
+        if(idOfUpdatedValue == null){
+            return;
         }
-
-        var idOfUpdatedValue = GeneralUtils.deduceId(updatedValue);
         var vp = getValuePool(invokedMethod);
         if (remove) {
             proxies.values().forEach(p -> p.cache.removeById(idOfUpdatedValue)); //will be removed from valuepool via the local caches, along with the ID from them.
@@ -140,7 +144,7 @@ public class MnemoService {
                 vp.put(idOfUpdatedValue, updatedValue, true);
                 return;
             }
-            vp.updateIfExists(idOfUpdatedValue, updatedValue);
+            vp.updateValueOrPutPreemptively(idOfUpdatedValue, updatedValue);
         }
 
     }

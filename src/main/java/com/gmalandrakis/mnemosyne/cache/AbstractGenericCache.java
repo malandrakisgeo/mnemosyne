@@ -48,23 +48,7 @@ public abstract class AbstractGenericCache<K, ID, V> extends AbstractMnemosyneCa
         setInternalThreads();
     }
 
-    public abstract void putAll(K key, Map<ID, V> value);
 
-    public abstract void put(K key, ID id, V value);
-
-    public abstract V get(K key);
-
-    public abstract Collection<V> getAll(K key);
-
-    public abstract Collection<V> getAll(Collection<K> key);
-
-    public abstract void remove(K key);
-
-    public abstract void removeOneFromCollection(K key, ID id);
-
-    public abstract void evict();
-
-    public abstract void invalidateCache();
 
     public boolean ishandleCollectionKeysSeparately() {
         return handleCollectionKeysSeparately;

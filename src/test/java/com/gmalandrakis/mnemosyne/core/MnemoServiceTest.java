@@ -165,10 +165,10 @@ public class MnemoServiceTest {
         var updater1 = innerClass.class.getDeclaredMethod("testpreemptiveUpdateWithList", List.class, Integer.class);
         var updater2 = innerClass.class.getDeclaredMethod("testpreemptiveUpdate", String.class, Integer.class);
         var instance = new innerClass();
-        var meth = mnemoService.generateForMethod(function, instance);
+        mnemoService.generateForMethod(function, instance);
         mnemoService.generateUpdatesForBean(instance);
         mnemoService.invokeMethodAndUpdate(updater2, instance, "extra string", 1);
-
+        Thread.sleep(500);
 
         List<String> result = (List<String>) mnemoService.fetchFromCacheOrInvokeMethodAndUpdate(function, 1);
 
