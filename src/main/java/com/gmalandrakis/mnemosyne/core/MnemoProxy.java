@@ -91,7 +91,7 @@ public class MnemoProxy<K, ID, V> {
                 return res.get(List.of(res.keySet()).get(0));
             } else {
                 if (List.class.isAssignableFrom(cachedMethod.getReturnType())) {
-                    return res.values().stream().toList();
+                    return res.values().stream().collect(Collectors.toList());
                 }
                 if (Set.class.isAssignableFrom(cachedMethod.getReturnType())) {
                     return res.values().stream().collect(Collectors.toSet());
@@ -268,7 +268,7 @@ public class MnemoProxy<K, ID, V> {
 
         List<K> failedKeys = Collections.synchronizedList(new ArrayList<K>()); //a list with the keys that did not return a value, i.e. returned empty collection or null.
         var keyValueMap = new ConcurrentHashMap<K, V>();
-        Map<ID, V> initiallyMissedFromCache = new HashMap<>();
+        Map<ID, V> initiallyMissedFromCache = new ConcurrentHashMap<>();
         keys.stream()
                 .parallel()
                 .forEach(k -> { //Note again that k is not a compoundKey!
@@ -277,6 +277,7 @@ public class MnemoProxy<K, ID, V> {
                         failedKeys.add(k);
                     } else {
                         keyValueMap.put(k, hit); //As noted in the documentation, a 1-1 correlation is assumed: one key corresponds to at most one value.
+                        initiallyMissedFromCache.put((ID) GeneralUtils.deduceId(hit),hit);
                     }
                 });
 

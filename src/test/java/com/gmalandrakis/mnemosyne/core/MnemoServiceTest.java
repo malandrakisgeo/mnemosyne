@@ -53,10 +53,15 @@ public class MnemoServiceTest {
 
         var millis = System.currentTimeMillis();
 
-        for (int i = 0; i < 1000; i++) {
+        for (int i = 1; i < 1000; i++) {
             var integersToI = this.getIntegersTo(i);
             var result = (List) mnemoService.fetchFromCacheOrInvokeMethodAndUpdate(innerClass.class.getDeclaredMethod("test11", List.class),  integersToI);
             //var result = (List) mnemoproxy11.fetchFromCacheOrInvokeMethod(instance, integersToI);
+            if(result.size() != integersToI.size()){
+                System.out.println(result);
+                System.out.println(integersToI);
+
+            }
             assert (result.size() == integersToI.size());
         }
         var secs = System.currentTimeMillis() - millis;
