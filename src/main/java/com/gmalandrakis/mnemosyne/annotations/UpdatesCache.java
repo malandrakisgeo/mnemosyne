@@ -110,6 +110,11 @@ public @interface UpdatesCache {
      */
     String[] removeOnCondition() default "";
 
+    /*
+        TODO: Add a flag that, if set to true, complementary logic for AddOnCondition/removeOnCondition will be set.
+        I.E., if the condition is false, then remove.
+     */
+
     /**
      * If set to true, all conditions in the addOnCondition and removeOnCondition have to be true in order for the new element to be added/removed.
      * Otherwise one suffices.

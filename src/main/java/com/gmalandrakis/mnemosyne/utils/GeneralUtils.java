@@ -10,9 +10,9 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.lang.reflect.Type;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class GeneralUtils {
@@ -32,7 +32,46 @@ public class GeneralUtils {
         return null;
     }
 
-    public static Object deduceId(Object object) {
+    public static String updateTypeInAnnotated(Annotation[][] parameterAnnotations,
+                                               Type[] types) {
+        // var paramannot = method.getParameterAnnotations();
+        int i = 0;
+        for (Annotation[] annotations : parameterAnnotations) {
+            for (Annotation annotation : annotations) {
+                if (annotation.annotationType() == UpdatedValue.class) {
+                    var name = types[i].getTypeName();
+                    if(!name.contains(">")){
+                        return name;
+                    }else{
+                        var secondSplit = name.split("<");
+                        var cleanType = secondSplit[secondSplit.length - 1].replace(">", "").replace("<", "").replace(",", "");
+                        return cleanType;
+                    }
+                }
+            }
+            i += 1;
+        }
+        return null;
+    }
+
+    public static String updateType(Method method) {
+        var type = GeneralUtils.updateTypeInAnnotated(method.getParameterAnnotations(), method.getGenericParameterTypes());
+        if(type == null){
+            var possibleType = method.getGenericReturnType().getTypeName();
+
+            if(!possibleType.contains(">")){
+                type = possibleType;
+            }else{
+                var secondSplit = possibleType.split("<");
+                var cleanType = secondSplit[secondSplit.length - 1].replace(">", "").replace("<", "").replace(",", "");
+                return cleanType;
+            }
+        }
+        return type;
+    }
+
+    //Returns just the ID of an object for single-value caches, or the id-value map for collection caches. TODO: Break in two separate functions for these purposes
+    public static Object deduceIdOrMap(Object object) {
         if (object == null) {
             return null;
         }
@@ -45,12 +84,12 @@ public class GeneralUtils {
         }
 
         if (object instanceof Iterable<?>) {
-            var keyIdMap = new ConcurrentHashMap<>();
+            var idObjectMap = new ConcurrentHashMap<>();
 
             ((Iterable) object).forEach(obj -> {
-                keyIdMap.put(deduceId(obj), obj); //Returns a Map<ID, V>
+                idObjectMap.put(deduceIdOrMap(obj), obj); //Returns a Map<ID, V>
             });
-            return keyIdMap;
+            return idObjectMap;
         }
 
         var idObjects = new ArrayList<>();

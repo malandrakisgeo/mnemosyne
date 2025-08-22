@@ -114,13 +114,13 @@ public abstract class AbstractMnemosyneCache<K, ID, V> {
 
 
     /**
-     * Removes an ID from a cache.
+     * Removes one or more IDs from a cache.
      * <p>
      * Implementations <b>must</b> call {@link com.gmalandrakis.mnemosyne.core.ValuePool#removeOrDecreaseNumberOfUsesForId ValuePool's removeOrDecreaseNumberOfUsesForId()},
      * otherwise the values may not be evicted from the value pool.
      **/
 
-    public abstract void removeById(ID id);
+    public abstract void removeById(Collection<ID> ids);
 
     /**
      * @return the name of the eviction algorithm

@@ -112,7 +112,7 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
                 numberOfUsesById.put(id, ++i);
             }
         }
-        valuePool.put(id,  initialNumOfUses == 0);
+        valuePool.put(id, initialNumOfUses == 0);
     }
 
     @Override
@@ -181,7 +181,7 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
             return;
         }
         if (key == null) {
-            removeById(id);
+            removeById(List.of(id));
         } else {
             var cacheData = (CollectionIdWrapper) keyIdMapper.get(key);
             if (cacheData == null) {
@@ -194,25 +194,27 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
     }
 
     @Override
-    public void removeById(ID id) {
+    public void removeById(Collection<ID> ids) {
         var relatedKeys = new HashSet<K>();
-        if (!returnsCollection) {
-            for (K k : keyIdMapper.keySet()) {
-                if(((SingleIdWrapper) k).getId().equals(id)){
-                    relatedKeys.add(k);
-                    removeOrDecreaseIdUses(id);
+
+        for (ID id : ids) {
+            if (!returnsCollection) {
+                for (K k : keyIdMapper.keySet()) {
+                    if (((SingleIdWrapper) k).getId().equals(id)) {
+                        relatedKeys.add(k);
+                        removeOrDecreaseIdUses(id);
+                    }
                 }
-            }
-        } else{
-            for (K k : keyIdMapper.keySet()) {
-                var deleted = ((CollectionIdWrapper) k).getIds().remove(id);
-                if (deleted) {
-                    relatedKeys.add(k);
-                    removeOrDecreaseIdUses(id);
+            } else {
+                for (K k : keyIdMapper.keySet()) {
+                    var deleted = ((CollectionIdWrapper) k).getIds().remove(id);
+                    if (deleted) {
+                        relatedKeys.add(k);
+                        removeOrDecreaseIdUses(id);
+                    }
                 }
             }
         }
-
 
         if (handleCollectionKeysSeparately || !returnsCollection) { //on special collection handling, a key corresponds to at most one ID
             relatedKeys.forEach(k -> {

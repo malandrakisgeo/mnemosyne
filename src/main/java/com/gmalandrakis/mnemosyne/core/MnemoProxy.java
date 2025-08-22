@@ -7,7 +7,6 @@ import com.gmalandrakis.mnemosyne.cache.AbstractGenericCache;
 import com.gmalandrakis.mnemosyne.cache.AbstractMnemosyneCache;
 import com.gmalandrakis.mnemosyne.structures.CompoundKey;
 import com.gmalandrakis.mnemosyne.utils.GeneralUtils;
-import com.google.common.collect.Iterables;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -117,7 +116,7 @@ public class MnemoProxy<K, ID, V> {
                 if (removeMode.equals(RemoveMode.REMOVE_VALUE_FROM_COLLECTION)) {
                     idValueMap.keySet().forEach(id -> cache.removeOneFromCollection(key, id));
                 } else if (removeMode.equals(RemoveMode.REMOVE_VALUE_FROM_ALL_COLLECTIONS)) {
-                    idValueMap.keySet().forEach(cache::removeById); //o prwtos pou tha mou steilei email gia auto to sxolio lamvanei pente evrw.
+                    cache.removeById(idValueMap.keySet());//o prwtos pou tha mou steilei email gia auto to sxolio lamvanei pente evrw.
                 }
             }
 
@@ -231,7 +230,7 @@ public class MnemoProxy<K, ID, V> {
     private Map<ID, V> getSingleAndUpdate(CompoundKey compoundKey, Object... args) {
         var value = (V) invokeUnderlyingMethod(args);
         if (value != null) {
-            var id = (ID) GeneralUtils.deduceId(value);
+            var id = (ID) GeneralUtils.deduceIdOrMap(value);
             valuePool.updateValueOrPutPreemptively(id, value);
             cache.put((K) compoundKey, (ID) id);
             return Map.of(id, value);
@@ -249,7 +248,7 @@ public class MnemoProxy<K, ID, V> {
         var value = invokeUnderlyingMethod(args);
         if (value != null) {
             assert (value instanceof Collection);
-            var map = (ConcurrentMap<ID, V>) GeneralUtils.deduceId(value);
+            var map = (ConcurrentMap<ID, V>) GeneralUtils.deduceIdOrMap(value);
             ignored.forEach(map::remove);
             map.forEach(valuePool::updateValueOrPutPreemptively);
             cache.putAll((K) compoundKey, map.keySet());
@@ -262,12 +261,12 @@ public class MnemoProxy<K, ID, V> {
     private Map<ID, V> getMultipleSpecialAndUpdate(CompoundKey compoundKey, Object... args) {
         assert (specialCollectionHandlingEnabled && compoundKey.getKeyObjects().length == 1
                 && compoundKey.getKeyObjects()[0] instanceof Collection && args.length == 1); //A very specific but very common subcase: calling a repository or rest-api method with a single Collection of IDs as argument
-        var returnTypeIsList = List.class.isAssignableFrom(cachedMethod.getReturnType());
+       // var returnTypeIsList = List.class.isAssignableFrom(cachedMethod.getReturnType());
         var keyTypeIsList = compoundKey.getKeyObjects()[0] instanceof List; // //Reminder that the Collection here may be only Set or List.
         var keys = (Collection<K>) compoundKey.getKeyObjects()[0]; //In this case, the compoundKey is not the key itself: it contains a Collection of the actual keys instead, created from the arguments given.
 
         List<K> failedKeys = Collections.synchronizedList(new ArrayList<K>()); //a list with the keys that did not return a value, i.e. returned empty collection or null.
-        var keyValueMap = new ConcurrentHashMap<K, V>();
+      //  var keyValueMap = new ConcurrentHashMap<K, V>();
         Map<ID, V> initiallyMissedFromCache = new ConcurrentHashMap<>();
         keys.stream()
                 .parallel()
@@ -276,8 +275,8 @@ public class MnemoProxy<K, ID, V> {
                     if (hit == null) {
                         failedKeys.add(k);
                     } else {
-                        keyValueMap.put(k, hit); //As noted in the documentation, a 1-1 correlation is assumed: one key corresponds to at most one value.
-                        initiallyMissedFromCache.put((ID) GeneralUtils.deduceId(hit),hit);
+                  //      keyValueMap.put(k, hit); //As noted in the documentation, a 1-1 correlation is assumed: one key corresponds to at most one value.
+                        initiallyMissedFromCache.put((ID) GeneralUtils.deduceIdOrMap(hit),hit);
                     }
                 });
 
@@ -288,7 +287,7 @@ public class MnemoProxy<K, ID, V> {
                                 var callWith = keyTypeIsList ? Collections.singletonList(failedKey) : Collections.singleton(failedKey);  //invoke with singleton List or Set.
                                 var value = invokeUnderlyingMethod(callWith);
                                 if (value == null) {
-                                    keyValueMap.put(failedKey, null);
+                                  //  keyValueMap.put(failedKey, null);
                                 } else {
                                     assert (value instanceof Collection); //TODO: Add this to generalControls and delete here.
                                     var valueCollection = (Collection<V>) value;
@@ -296,12 +295,12 @@ public class MnemoProxy<K, ID, V> {
                                         //Add nothing to the cache or the result. It is apparent that the method is "null-aversive" and just ignores the values that were not found. So just do the same.
                                     } else {
                                         assert (valueCollection.size() == 1); //1-1 correlation violated otherwise! It was called with a singletonList, so at most one value is expected if we have a 1-1 correlation
-                                        var id = (ID) GeneralUtils.deduceId(valueCollection.toArray()[0]);
+                                        var id = (ID) GeneralUtils.deduceIdOrMap(valueCollection.toArray()[0]);
                                         var val = (V) valueCollection.toArray()[0];
                                         initiallyMissedFromCache.put(id, val);
                                         valuePool.updateValueOrPutPreemptively(id, val);
                                         cache.put((K) GeneralUtils.deduceCompoundKeyFromMethodAndArgs(cachedMethod, new Object[]{failedKey}), id);
-                                        keyValueMap.put(failedKey, Iterables.get(valueCollection, 0));
+                                      //  keyValueMap.put(failedKey, Iterables.get(valueCollection, 0));
                                     }
                                 }
                             }

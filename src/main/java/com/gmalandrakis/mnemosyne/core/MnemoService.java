@@ -18,7 +18,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
-import static com.gmalandrakis.mnemosyne.utils.GeneralUtils.getAnnotatedUpdatedValue;
 import static com.gmalandrakis.mnemosyne.utils.ParameterUtils.annotationValuesToCacheParameters;
 
 /**
@@ -44,8 +43,14 @@ public class MnemoService {
         } catch (IllegalAccessException | InvocationTargetException e) {
             throw new RuntimeException(e);
         }
-        var id = GeneralUtils.deduceId(object);
-        updateValuePool(method, id, object, false, false, args); //TODO: Fetch the actual values
+        var id = GeneralUtils.deduceIdOrMap(object);
+        ///updateValuePool(method, id, object, false, false);
+        //TODO: Fetch the actual values for 'remove' and 'addIfAbsent'
+        if (id instanceof Map) {
+            updateValuePool(method, (Map) id, false, false);
+        } else {
+            updateValuePool(method, Map.of(id, object), false, false);
+        }
         return object;
     }
 
@@ -61,9 +66,14 @@ public class MnemoService {
         if (updatedValue != null) {
             object = updatedValue; // Which means that if there is any @UpdatedValue in the arguments, the result of the method is not used for updates!.
         }
-        var id = GeneralUtils.deduceId(object);
-        updateValuePool(method,id, object, false, false, args);
-        updateRelatedCaches(method, id, object, args);
+        var id = GeneralUtils.deduceIdOrMap(object);
+        if (id instanceof Map) {
+            updateValuePool(method, (Map) id, false, false);
+            updateRelatedCaches(method, (Map) id, args);
+        } else {
+            updateValuePool(method, Map.of(id, object), false, false);
+            updateRelatedCaches(method, Map.of(id, object), args);
+        }
 
         return object;
     }
@@ -73,11 +83,9 @@ public class MnemoService {
         assert (cacheProxy != null);
         Object result = tryFetchFromCache(cacheProxy, args);
         if (result == null) {
-            var idValMap  = cacheProxy.getFromUnderlyingMethodAndUpdateMainCache(args);
-            threadPool.execute(()->{
-                idValMap.forEach((id, v)->{
-                    updateRelatedCaches(method, id ,v, args);
-                });
+            var idValMap = cacheProxy.getFromUnderlyingMethodAndUpdateMainCache(args);
+            threadPool.execute(() -> {
+                updateRelatedCaches(method, idValMap, args);
             });
             result = cacheProxy.deduce(idValMap);
         }
@@ -85,16 +93,20 @@ public class MnemoService {
     }
 
 
-    public void updateRelatedCaches(Method method, Object id, Object possibleUpdatedValue, Object... args) {
+    public void updateRelatedCaches(Method method, Map<?, ?> idValMap, Object... args) {
         var updatesCaches = method.getAnnotation(UpdatesCaches.class);
         if (updatesCaches != null) {
             for (UpdatesCache updateCache : updatesCaches.value()) {
-                this.updateRelatedCache(updateCache, method.getParameterAnnotations(),id, possibleUpdatedValue, args);
+                idValMap.forEach((id, v) -> {
+                    this.updateRelatedCache(updateCache, method.getParameterAnnotations(), id, v, args);
+                });
             }
         }
         var updateCache = method.getAnnotation(UpdatesCache.class);
         if (updateCache != null) {
-            this.updateRelatedCache(updateCache, method.getParameterAnnotations(),id, possibleUpdatedValue, args);
+            idValMap.forEach((id, v) -> {
+                this.updateRelatedCache(updateCache, method.getParameterAnnotations(), id, v, args);
+            });
         }
     }
 
@@ -106,7 +118,6 @@ public class MnemoService {
         assert (cacheToBeUpdated != null);
         var cachedMethod = cacheToBeUpdated.getCachedMethod();
         var annotatedKeyNamesAndValues = getUpdateKeyNamesAndCorrespondingValues(methodParameterAnnotations, updateCache.annotatedKeys(), args);
-
 
         //final Object finalUpdatedValue = updatedValue;
 
@@ -131,20 +142,29 @@ public class MnemoService {
         }
     }
 
-    private void updateValuePool(Method invokedMethod, Object idOfUpdatedValue, Object updatedValue, boolean remove, boolean addIfAbsent, Object... args) {
-        if(idOfUpdatedValue == null){
+    private void updateValuePool(Method invokedMethod, Map<?, ?> idObjectMap, boolean remove, boolean addIfAbsent) {
+        if (idObjectMap == null) {
             return;
         }
         var vp = getValuePool(invokedMethod);
+
         if (remove) {
-            proxies.values().forEach(p -> p.cache.removeById(idOfUpdatedValue)); //will be removed from valuepool via the local caches, along with the ID from them.
-            return;
+            var ids = idObjectMap.keySet();
+
+            proxies.values().forEach(p -> {
+                p.cache.removeById(ids); //will be removed from valuepool via the local caches, along with the ID from them.
+            });
         } else {
-            if (addIfAbsent) {
-                vp.put(idOfUpdatedValue, updatedValue, true);
-                return;
-            }
-            vp.updateValueOrPutPreemptively(idOfUpdatedValue, updatedValue);
+            idObjectMap.forEach((id, v) -> {
+                if (v != null) { //TODO: This should not be possible Verify it indeed isn't.
+                    if (addIfAbsent) {
+                        vp.put(id, v, true);
+                        return;
+                    }
+                    vp.updateValueOrPutPreemptively(id, v);
+                }
+            });
+
         }
 
     }
@@ -185,12 +205,25 @@ public class MnemoService {
         return cacheProxy.getFromCache(args);
     }
 
+    //TODO: Unit test
     ValuePool getValuePool(Method method) {
+        var cleanType = GeneralUtils.updateType(method);
+
+        var vp = valuePoolConcurrentHashMap.get(cleanType);
+        if (vp == null) {
+            throw new MnemosyneRuntimeException("Value pool not found for method " + method.getName());
+        }
+        return vp;
+    }
+
+
+    ValuePool getOrCreateValuePool(Method method) {
         var cleanType = getCleanType(method);
         return valuePoolConcurrentHashMap.computeIfAbsent(cleanType, k -> new ValuePool<>());
     }
 
     private String getCleanType(Method method) {
+
         var methodDescription = method.toGenericString(); //!!!!!!
         methodDescription = methodDescription.replace("private ", "").replace("protected ", "").replace("public ", ""); //terralol, TODO find some less cringy way to achieve this
         try {
@@ -261,7 +294,7 @@ public class MnemoService {
         generalControls(method, cacheParams);
 
         Class<? extends AbstractMnemosyneCache> algoClass = cacheParams.getCacheType();
-        ValuePool valuePool = getValuePool(method);
+        ValuePool valuePool = getOrCreateValuePool(method);
         AbstractMnemosyneCache cache = null;
         try {
             cache = algoClass.getDeclaredConstructor(CacheParameters.class, ValuePool.class).newInstance(cacheParams, valuePool);
