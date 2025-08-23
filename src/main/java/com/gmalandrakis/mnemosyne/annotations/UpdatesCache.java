@@ -102,13 +102,21 @@ public @interface UpdatesCache {
      *       public void saveUserDetails(@UpdatedValue User newUser)
      *       }
      *       </pre>
+     * Set complementaryCondition to true if you expect a removal when the condition is false and the object is present in the cache.
      */
     String[] addOnCondition() default "";
 
     /**
      * Similar to addOnCondition.
+     * Set complementaryCondition to true if you expect an addition when the condition is false and the object is present in the cache.
      */
     String[] removeOnCondition() default "";
+
+    /**
+     * AddOnCondition is often complementary to removeOnCondition (i.e. "add to cache if A"  often implies "evict from cache if not A"), and vice versa.
+     * Setting complementaryCondition treats the inverse of the given condition for adding as a condition for removing, and vice versa.
+     */
+    boolean complementaryCondition() default false;
 
     /*
         TODO: Add a flag that, if set to true, complementary logic for AddOnCondition/removeOnCondition will be set.

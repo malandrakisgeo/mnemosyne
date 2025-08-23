@@ -124,21 +124,24 @@ public class MnemoService {
 
         var targetKeyNamesAndValues = linkTargetObjectKeysToObjects(List.of(targetObjectKeyNamesAndValues), updatedValue);
 
-        var conditionalRemoval = getCondition(updateCache.removeOnCondition(), annotatedKeyNamesAndValues, updatedValue, updateCache.conditionalANDGate());
-        var conditionalAdd = getCondition(updateCache.addOnCondition(), annotatedKeyNamesAndValues, updatedValue, updateCache.conditionalANDGate());
+        var explicitRemovalOnCondition = getCondition(updateCache.removeOnCondition(), annotatedKeyNamesAndValues, updatedValue, updateCache.conditionalANDGate());
+        var explicitAddOnCondition = getCondition(updateCache.addOnCondition(), annotatedKeyNamesAndValues, updatedValue, updateCache.conditionalANDGate());
+        var implicitRemoval = updateCache.complementaryCondition() && !explicitAddOnCondition;
+        var implicitAdd = updateCache.complementaryCondition() && !explicitRemovalOnCondition;
+
         var key = getCompoundKeyForUpdate(annotatedKeyNamesAndValues, targetKeyNamesAndValues, updateCache.keyOrder(), cachedMethod, cacheToBeUpdated.isSpecialCollectionHandlingEnabled());
 
         if (idOfUpdatedValue == null && updatedValue == null) { //this can only happen on key removal.
-            cacheToBeUpdated.updateByRemoving(key, null, conditionalRemoval, updateCache.removeMode());
+            cacheToBeUpdated.updateByRemoving(key, null, explicitRemovalOnCondition, updateCache.removeMode());
             return;
         }
-        if (idOfUpdatedValue instanceof Map) { //This should be impossible with this flow. Test and verify
-            cacheToBeUpdated.updateByRemoving(key, (Map) idOfUpdatedValue, conditionalRemoval, updateCache.removeMode());
-            cacheToBeUpdated.updateByAdding(key, (Map) idOfUpdatedValue, conditionalAdd, updateCache.addMode());
+        if (idOfUpdatedValue instanceof Map) { //This should be impossible with the new flow. TODO: Test and verify, and remove if so
+            cacheToBeUpdated.updateByRemoving(key, (Map) idOfUpdatedValue, explicitRemovalOnCondition || implicitRemoval, updateCache.removeMode());
+            cacheToBeUpdated.updateByAdding(key, (Map) idOfUpdatedValue, explicitAddOnCondition || implicitAdd, updateCache.addMode());
 
         } else {
-            cacheToBeUpdated.updateByRemoving(key, Map.of(idOfUpdatedValue, updatedValue), conditionalRemoval, updateCache.removeMode());
-            cacheToBeUpdated.updateByAdding(key, Map.of(idOfUpdatedValue, updatedValue), conditionalAdd, updateCache.addMode());
+            cacheToBeUpdated.updateByRemoving(key, Map.of(idOfUpdatedValue, updatedValue), explicitRemovalOnCondition || implicitRemoval, updateCache.removeMode());
+            cacheToBeUpdated.updateByAdding(key, Map.of(idOfUpdatedValue, updatedValue), explicitAddOnCondition || implicitAdd, updateCache.addMode());
         }
     }
 
@@ -244,7 +247,7 @@ public class MnemoService {
 
     private Boolean getCondition(String[] conditions, Map<String, Object> annotatedKeyNamesAndValues, Object updatedObject, boolean conditionalAND) {
         if (conditions == null || (conditions.length == 1 && conditions[0].isEmpty())) {
-            return null;
+            return false;
         }
 
         List<Boolean> booleans = new ArrayList<>();
