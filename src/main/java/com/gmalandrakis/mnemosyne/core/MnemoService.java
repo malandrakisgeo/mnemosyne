@@ -44,12 +44,13 @@ public class MnemoService {
             throw new RuntimeException(e);
         }
         var id = GeneralUtils.deduceIdOrMap(object);
-        ///updateValuePool(method, id, object, false, false);
-        //TODO: Fetch the actual values for 'remove' and 'addIfAbsent'
+
+        var annotation = method.getAnnotation(UpdatesValuePool.class);
+        assert (annotation != null);
         if (id instanceof Map) {
-            updateValuePool(method, (Map) id, false, false);
+            updateValuePool(method, (Map) id, annotation.remove(), annotation.addIfAbsent());
         } else {
-            updateValuePool(method, Map.of(id, object), false, false);
+            updateValuePool(method, Map.of(id, object), annotation.remove(), annotation.addIfAbsent());
         }
         return object;
     }
@@ -91,22 +92,22 @@ public class MnemoService {
     }
 
     public void updateRelatedCaches(Method method, Map<?, ?> idValMap, Object... args) {
-     //   threadPool.execute(() -> {
-            var updatesCaches = method.getAnnotation(UpdatesCaches.class);
-            if (updatesCaches != null) {
-                for (UpdatesCache updateCache : updatesCaches.value()) {
-                    idValMap.forEach((id, v) -> {
-                        this.updateRelatedCache(updateCache, method.getParameterAnnotations(), id, v, args);
-                    });
-                }
-            }
-            var updateCache = method.getAnnotation(UpdatesCache.class);
-            if (updateCache != null) {
+        //   threadPool.execute(() -> {
+        var updatesCaches = method.getAnnotation(UpdatesCaches.class);
+        if (updatesCaches != null) {
+            for (UpdatesCache updateCache : updatesCaches.value()) {
                 idValMap.forEach((id, v) -> {
                     this.updateRelatedCache(updateCache, method.getParameterAnnotations(), id, v, args);
                 });
             }
-    //    });
+        }
+        var updateCache = method.getAnnotation(UpdatesCache.class);
+        if (updateCache != null) {
+            idValMap.forEach((id, v) -> {
+                this.updateRelatedCache(updateCache, method.getParameterAnnotations(), id, v, args);
+            });
+        }
+        //    });
     }
 
     //TODO: Simplify the flow here
