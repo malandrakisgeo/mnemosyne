@@ -84,30 +84,29 @@ public class MnemoService {
         Object result = tryFetchFromCache(cacheProxy, args);
         if (result == null) {
             var idValMap = cacheProxy.getFromUnderlyingMethodAndUpdateMainCache(args);
-            threadPool.execute(() -> {
-                updateRelatedCaches(method, idValMap, args);
-            });
+            updateRelatedCaches(method, idValMap, args);
             result = cacheProxy.deduce(idValMap);
         }
         return result;
     }
 
-
     public void updateRelatedCaches(Method method, Map<?, ?> idValMap, Object... args) {
-        var updatesCaches = method.getAnnotation(UpdatesCaches.class);
-        if (updatesCaches != null) {
-            for (UpdatesCache updateCache : updatesCaches.value()) {
+     //   threadPool.execute(() -> {
+            var updatesCaches = method.getAnnotation(UpdatesCaches.class);
+            if (updatesCaches != null) {
+                for (UpdatesCache updateCache : updatesCaches.value()) {
+                    idValMap.forEach((id, v) -> {
+                        this.updateRelatedCache(updateCache, method.getParameterAnnotations(), id, v, args);
+                    });
+                }
+            }
+            var updateCache = method.getAnnotation(UpdatesCache.class);
+            if (updateCache != null) {
                 idValMap.forEach((id, v) -> {
                     this.updateRelatedCache(updateCache, method.getParameterAnnotations(), id, v, args);
                 });
             }
-        }
-        var updateCache = method.getAnnotation(UpdatesCache.class);
-        if (updateCache != null) {
-            idValMap.forEach((id, v) -> {
-                this.updateRelatedCache(updateCache, method.getParameterAnnotations(), id, v, args);
-            });
-        }
+    //    });
     }
 
     //TODO: Simplify the flow here
@@ -247,7 +246,7 @@ public class MnemoService {
 
     private Boolean getCondition(String[] conditions, Map<String, Object> annotatedKeyNamesAndValues, Object updatedObject, boolean conditionalAND) {
         if (conditions == null || (conditions.length == 1 && conditions[0].isEmpty())) {
-            return false;
+            return true; //If there is no condition, we tell mnemosyne "just add or remove the value without caring about it's fields"
         }
 
         List<Boolean> booleans = new ArrayList<>();

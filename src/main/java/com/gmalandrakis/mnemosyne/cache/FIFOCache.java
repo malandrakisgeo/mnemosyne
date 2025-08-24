@@ -41,8 +41,6 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
      */
     final ConcurrentHashMap<ID, Integer> numberOfUsesById = new ConcurrentHashMap<ID, Integer>();
 
-    private int idsInCache = 0;
-
     public FIFOCache(CacheParameters parameters, ValuePool poolService) {
         super(parameters, poolService);
     }
@@ -207,9 +205,12 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
                 }
             } else {
                 for (K k : keyIdMapper.keySet()) {
-                    var deleted = ((CollectionIdWrapper) k).getIds().remove(id);
+                    var savedIds = ((CollectionIdWrapper) keyIdMapper.get(k)).getIds();
+                    var deleted = savedIds.remove(id);
                     if (deleted) {
-                        relatedKeys.add(k);
+                        if (savedIds.isEmpty()) {
+                            relatedKeys.add(k);
+                        }
                         removeOrDecreaseIdUses(id);
                     }
                 }

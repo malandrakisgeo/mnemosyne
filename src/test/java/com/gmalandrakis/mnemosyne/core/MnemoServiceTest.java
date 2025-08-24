@@ -182,7 +182,7 @@ public class MnemoServiceTest {
         mnemoService.generateForMethod(function, instance);
         mnemoService.generateUpdatesForBean(instance);
         mnemoService.invokeMethodAndUpdate(updater2, instance, "extra string", 1);
-        Thread.sleep(500);
+      //  Thread.sleep(200);
 
         List<String> result = (List<String>) mnemoService.fetchFromCacheOrInvokeMethodAndUpdate(function, 1);
 
@@ -190,7 +190,9 @@ public class MnemoServiceTest {
         assert (result.contains("extra string"));
 
         mnemoService.invokeMethodAndUpdate(updater1, instance, List.of("val3"), 2);
-         result = (List<String>) mnemoService.fetchFromCacheOrInvokeMethodAndUpdate(function, 2);
+       // Thread.sleep(200);
+
+        result = (List<String>) mnemoService.fetchFromCacheOrInvokeMethodAndUpdate(function, 2);
 
         assert (result.size() == 4);
         assert (result.contains("val3"));

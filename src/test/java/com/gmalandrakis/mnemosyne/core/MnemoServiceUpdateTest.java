@@ -36,6 +36,7 @@ public class MnemoServiceUpdateTest {
         cust.setId(str.toString());
 
         mnemoService.invokeMethodAndUpdate(updater, innerClass, cust);
+        //Thread.sleep(200);
 
         assert (mnemoService.tryFetchFromCache(test9Proxy, str.toString()) != null);
 

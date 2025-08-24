@@ -12,7 +12,7 @@ By default, mnemosyne includes implementations of FIFO and LRU.
 Mnemosyne currently works with Spring, but more integrations are coming.
 
 ## Basic idea
-The basic idea is that, when multiple Java Methods returning the same object type are cached, it should be possible to update
+The basic idea is that, when multiple Java Methods returning the same object type are cached, it should be possible to update all
 their caches at once. One can assign a unique ID to a cached object, and that ID can then be used for simultaneous updates of multiple caches.
 
 The objects may be returned from a cache as they are, or as collection elements. Some caches may be subject to conditional updates.
