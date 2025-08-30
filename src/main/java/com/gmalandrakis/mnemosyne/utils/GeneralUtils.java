@@ -40,9 +40,9 @@ public class GeneralUtils {
             for (Annotation annotation : annotations) {
                 if (annotation.annotationType() == UpdatedValue.class) {
                     var name = types[i].getTypeName();
-                    if(!name.contains(">")){
+                    if (!name.contains(">")) {
                         return name;
-                    }else{
+                    } else {
                         var secondSplit = name.split("<");
                         var cleanType = secondSplit[secondSplit.length - 1].replace(">", "").replace("<", "").replace(",", "");
                         return cleanType;
@@ -56,12 +56,12 @@ public class GeneralUtils {
 
     public static String updateType(Method method) {
         var type = GeneralUtils.updateTypeInAnnotated(method.getParameterAnnotations(), method.getGenericParameterTypes());
-        if(type == null){
+        if (type == null) {
             var possibleType = method.getGenericReturnType().getTypeName();
 
-            if(!possibleType.contains(">")){
+            if (!possibleType.contains(">")) {
                 type = possibleType;
-            }else{
+            } else {
                 var secondSplit = possibleType.split("<");
                 var cleanType = secondSplit[secondSplit.length - 1].replace(">", "").replace("<", "").replace(",", "");
                 return cleanType;
@@ -218,6 +218,17 @@ public class GeneralUtils {
             }
         }
         return null;
+    }
+
+    public static boolean allNull(Collection<?> col) {
+        boolean allNull = true;
+        for (Object o : col) {
+            if (o != null) {
+                allNull = false;
+                break;
+            }
+        }
+        return allNull;
     }
 
 

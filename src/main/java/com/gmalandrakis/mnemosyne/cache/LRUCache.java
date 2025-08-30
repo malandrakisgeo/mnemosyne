@@ -12,6 +12,7 @@ import java.util.stream.Collectors;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
 public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
+
     final ConcurrentHashMap<ID, Integer> numberOfUsesById = new ConcurrentHashMap<ID, Integer>();
 
     public LRUCache(CacheParameters cacheParameters, ValuePool poolService) {
@@ -170,6 +171,9 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
             }
             if (cacheData.getIds().remove(id)) {
                 removeOrDecreaseIdUses(id);
+            }
+            if (cacheData.getIds().isEmpty()) {
+                keyIdMapper.remove(key);
             }
         }
     }

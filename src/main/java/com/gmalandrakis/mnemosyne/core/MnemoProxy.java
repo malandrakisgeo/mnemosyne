@@ -17,6 +17,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
+import static com.gmalandrakis.mnemosyne.utils.GeneralUtils.allNull;
 import static com.gmalandrakis.mnemosyne.utils.GeneralUtils.getAnnotatedUpdatedValue;
 
 /**
@@ -291,7 +292,7 @@ public class MnemoProxy<K, ID, V> {
                                 } else {
                                     assert (value instanceof Collection); //TODO: Add this to generalControls and delete here.
                                     var valueCollection = (Collection<V>) value;
-                                    if (valueCollection.isEmpty()) {
+                                    if (valueCollection.isEmpty() || allNull(valueCollection)) {
                                         //Add nothing to the cache or the result. It is apparent that the method is "null-aversive" and just ignores the values that were not found. So just do the same.
                                     } else {
                                         assert (valueCollection.size() == 1); //1-1 correlation violated otherwise! It was called with a singletonList, so at most one value is expected if we have a 1-1 correlation

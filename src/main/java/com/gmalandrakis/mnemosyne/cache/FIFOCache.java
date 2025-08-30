@@ -187,6 +187,10 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
             }
             if (cacheData.getIds().remove(id)) {
                 removeOrDecreaseIdUses(id);
+                if(cacheData.getIds().isEmpty()){
+                    keyIdMapper.remove(key);
+                    concurrentFIFOQueue.remove(key);
+                }
             }
         }
     }
