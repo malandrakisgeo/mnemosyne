@@ -43,6 +43,11 @@ public class MnemoService {
         } catch (IllegalAccessException | InvocationTargetException e) {
             throw new RuntimeException(e);
         }
+        Object updatedValue = getAnnotatedUpdatedValue(method.getParameterAnnotations(), args); // check if any of the args is annotated as @UpdatedValue.
+
+        if (updatedValue != null) {
+            object = updatedValue; // Which means that if there is any @UpdatedValue in the arguments, the result of the method is not used for updates!.
+        }
         var id = GeneralUtils.deduceIdOrMap(object);
 
         var annotation = method.getAnnotation(UpdatesValuePool.class);
@@ -129,18 +134,23 @@ public class MnemoService {
         var implicitRemoval = updateCache.complementaryCondition() && !explicitAddOnCondition;
         var implicitAdd = updateCache.complementaryCondition() && !explicitRemovalOnCondition;
 
+        var removeMode = updateCache.removeMode();
+        if(removeMode == UpdatesCache.RemoveMode.NONE && implicitRemoval){
+            removeMode = UpdatesCache.RemoveMode.values()[updateCache.addMode().ordinal()];
+        }
+
         var key = getCompoundKeyForUpdate(annotatedKeyNamesAndValues, targetKeyNamesAndValues, updateCache.keyOrder(), cachedMethod, cacheToBeUpdated.isSpecialCollectionHandlingEnabled());
 
         if (idOfUpdatedValue == null && updatedValue == null) { //this can only happen on key removal.
-            cacheToBeUpdated.updateByRemoving(key, null, explicitRemovalOnCondition, updateCache.removeMode());
+            cacheToBeUpdated.updateByRemoving(key, null, explicitRemovalOnCondition, removeMode);
             return;
         }
         if (idOfUpdatedValue instanceof Map) { //This should be impossible with the new flow. TODO: Test and verify, and remove if so
-            cacheToBeUpdated.updateByRemoving(key, (Map) idOfUpdatedValue, explicitRemovalOnCondition || implicitRemoval, updateCache.removeMode());
+            cacheToBeUpdated.updateByRemoving(key, (Map) idOfUpdatedValue, explicitRemovalOnCondition || implicitRemoval, removeMode);
             cacheToBeUpdated.updateByAdding(key, (Map) idOfUpdatedValue, explicitAddOnCondition || implicitAdd, updateCache.addMode());
 
         } else {
-            cacheToBeUpdated.updateByRemoving(key, Map.of(idOfUpdatedValue, updatedValue), explicitRemovalOnCondition || implicitRemoval, updateCache.removeMode());
+            cacheToBeUpdated.updateByRemoving(key, Map.of(idOfUpdatedValue, updatedValue), explicitRemovalOnCondition || implicitRemoval, removeMode);
             cacheToBeUpdated.updateByAdding(key, Map.of(idOfUpdatedValue, updatedValue), explicitAddOnCondition || implicitAdd, updateCache.addMode());
         }
     }
