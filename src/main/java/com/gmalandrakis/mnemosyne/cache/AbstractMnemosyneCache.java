@@ -49,20 +49,25 @@ public abstract class AbstractMnemosyneCache<K, ID, V> {
 
     /**
      * Adds the given key-value pair to the cache.
+     * <p>
+     * Implementations <b>must</b> call {@link com.gmalandrakis.mnemosyne.core.ValuePool#put ValuePool's put()}
      */
-    public abstract void put(K key, ID id, V value);
+    public abstract void put(K key, ID id);
 
     /**
      * Adds multiple values along with their IDs for a single key.
-     * Should only be implemented for collection caches.
+     * Should only be implemented for collection caches.     <p>
+     * Implementations <b>must</b> call {@link com.gmalandrakis.mnemosyne.core.ValuePool#put ValuePool's put()}
      */
-    public abstract void putAll(K key, Map<ID, V> ídValueMap);
+    public abstract void putAll(K key, Collection<ID> ídValueMap);
 
     /**
      * Adds a particular ID in all available collection caches independently of the keys corresponding to them.
      * Should only be implemented for collection caches.
+     * <p>
+     * Implementations <b>must</b> call {@link com.gmalandrakis.mnemosyne.core.ValuePool#put ValuePool's put()}
      **/
-    public abstract void putInAllCollections(ID id, V value);
+    public abstract void putInAllCollections(ID id);
 
     /**
      * For collection caches -i.e. caches where one key can correspond to multiple values.
@@ -82,7 +87,6 @@ public abstract class AbstractMnemosyneCache<K, ID, V> {
 
     /**
      * Retrieves a value for a given key.
-     *
      */
     public abstract V get(K key);
 
@@ -91,7 +95,9 @@ public abstract class AbstractMnemosyneCache<K, ID, V> {
      * from the ValuePool (if no other caches are using it).
      * If the underlying cache stores Collections of objects, all associated objects
      * may be removed from the ValuePool if eligible.
-     *
+     * <p>
+     * Implementations <b>must</b> call {@link com.gmalandrakis.mnemosyne.core.ValuePool#removeOrDecreaseNumberOfUsesForId ValuePool's removeOrDecreaseNumberOfUsesForId()},
+     * otherwise the values may not be evicted from the value pool.
      */
     public abstract void remove(K key);
 
@@ -100,16 +106,21 @@ public abstract class AbstractMnemosyneCache<K, ID, V> {
      * Removes exactly one ID and possibly its' associated value from the ValuePool for the collection
      * corresponding to the given key.
      * If no key is provided, the ID is removed from all collections for all available keys.
-     *
+     * <p>
+     * Implementations <b>must</b> call {@link com.gmalandrakis.mnemosyne.core.ValuePool#removeOrDecreaseNumberOfUsesForId ValuePool's removeOrDecreaseNumberOfUsesForId()},
+     * otherwise the values may not be evicted from the value pool.
      */
     public abstract void removeOneFromCollection(K key, ID id);
 
+
     /**
-     * Removes an ID from all available entries of a collection cache independently of keys.
+     * Removes one or more IDs from a cache.
+     * <p>
+     * Implementations <b>must</b> call {@link com.gmalandrakis.mnemosyne.core.ValuePool#removeOrDecreaseNumberOfUsesForId ValuePool's removeOrDecreaseNumberOfUsesForId()},
+     * otherwise the values may not be evicted from the value pool.
      **/
 
-    public abstract void removeFromAllCollections(ID id);
-
+    public abstract void removeById(Collection<ID> ids);
 
     /**
      * @return the name of the eviction algorithm
@@ -119,12 +130,11 @@ public abstract class AbstractMnemosyneCache<K, ID, V> {
     /**
      * Used to retrieve the next element that is of most interest to the algorithm.
      * A use case example is getting the key of the object that should be evicted next.
-     *
      */
     public abstract K getTargetKey();
 
     /**
-     * Removes all the expired or otherwise irrelevant entries.
+     * Removes all the expired or otherwise irrelevant entries. Implementations must act on the ValuePool too.
      */
     public abstract void evict();
 

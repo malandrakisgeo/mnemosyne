@@ -25,7 +25,8 @@ public class MnemosyneSpringConf {
         AspectJExpressionPointcut pointcut = new AspectJExpressionPointcut();
         pointcut.setExpression("@annotation(com.gmalandrakis.mnemosyne.annotations.Cached) " +
                 "|| @annotation(com.gmalandrakis.mnemosyne.annotations.UpdatesCache) " +
-                "|| @annotation(com.gmalandrakis.mnemosyne.annotations.UpdatesCaches)");
+                "|| @annotation(com.gmalandrakis.mnemosyne.annotations.UpdatesCaches)" +
+                "|| @annotation(com.gmalandrakis.mnemosyne.annotations.UpdatesValuePool) ");
         return new DefaultPointcutAdvisor(pointcut, springInterceptor);
     }
 

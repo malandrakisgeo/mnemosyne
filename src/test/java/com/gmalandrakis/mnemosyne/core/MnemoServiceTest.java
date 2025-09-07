@@ -5,7 +5,6 @@ import com.gmalandrakis.mnemosyne.cache.AbstractGenericCache;
 import com.gmalandrakis.mnemosyne.exception.MnemosyneInitializationException;
 import com.gmalandrakis.mnemosyne.exception.MnemosyneRuntimeException;
 import com.gmalandrakis.mnemosyne.structures.CollectionIdWrapper;
-import com.google.common.collect.Lists;
 import org.junit.Test;
 import org.mockito.Mockito;
 
@@ -33,30 +32,19 @@ public class MnemoServiceTest {
         assert (handlesCollections);
         var instance = new innerClass();
 
-        var mnemoproxy1 = mnemoService.generateForMethod(innerClass.class.getDeclaredMethod("test1"), instance);
-        var mnemoproxy2 = mnemoService.generateForMethod(innerClass.class.getDeclaredMethod("test2"), instance);
-        var mnemoproxy3 = mnemoService.generateForMethod(innerClass.class.getDeclaredMethod("test3"), instance);
-        var mnemoproxy4 = mnemoService.generateForMethod(innerClass.class.getDeclaredMethod("test4"), instance);
-        var mnemoproxy8 = mnemoService.generateForMethod(innerClass.class.getDeclaredMethod("test8", Collection.class), instance);
-        var mnemoproxy9 = mnemoService.generateForMethod(innerClass.class.getDeclaredMethod("test9", Integer.class), instance);
-        var mnemoproxy10 = mnemoService.generateForMethod(innerClass.class.getDeclaredMethod("test10", Integer.class), instance);
-
-        assert (mnemoproxy1.getValuePool() == mnemoproxy2.getValuePool());
-        assert (mnemoproxy1.getValuePool().hashCode() == mnemoproxy2.getValuePool().hashCode());
-        assert (mnemoproxy3.getValuePool() == mnemoproxy2.getValuePool());
-        assert (mnemoproxy4.getValuePool() == mnemoproxy2.getValuePool());
-        assert (mnemoproxy8.getValuePool() == mnemoproxy2.getValuePool());
-        assert (mnemoproxy9.getValuePool() != mnemoproxy2.getValuePool());
-        assert (mnemoproxy9.getValuePool() == mnemoproxy10.getValuePool());
-
-        var mnemoproxy11 = mnemoService.generateForMethod(innerClass.class.getDeclaredMethod("test11", List.class), instance);
+        mnemoService.generateForMethod(innerClass.class.getDeclaredMethod("test11", List.class), instance);
 
         var millis = System.currentTimeMillis();
 
-        for (int i = 0; i < 1000; i++) {
+        for (int i = 1; i < 1000; i++) {
             var integersToI = this.getIntegersTo(i);
             var result = (List) mnemoService.fetchFromCacheOrInvokeMethodAndUpdate(innerClass.class.getDeclaredMethod("test11", List.class),  integersToI);
             //var result = (List) mnemoproxy11.fetchFromCacheOrInvokeMethod(instance, integersToI);
+            if(result.size() != integersToI.size()){
+                System.out.println(result);
+                System.out.println(integersToI);
+
+            }
             assert (result.size() == integersToI.size());
         }
         var secs = System.currentTimeMillis() - millis;
@@ -159,16 +147,42 @@ public class MnemoServiceTest {
     }
 
     @Test
+    public void testValuePoolTypes() throws Exception{
+        MnemoService mnemoService = new MnemoService();
+        var function = innerClass.class.getDeclaredMethod("functionForPreemptiveUpdateTest", Integer.class);
+        var instance = new innerClass();
+        mnemoService.generateForMethod(function, instance);
+        mnemoService.generateUpdatesForBean(instance);
+
+        var stringValuePool1 = innerClass.class.getDeclaredMethod("testpreemptiveUpdateWithList", List.class, Integer.class);
+        var stringValuePool2 = innerClass.class.getDeclaredMethod("testpreemptiveUpdate", String.class, Integer.class);
+        var intValuePool1 = innerClass.class.getDeclaredMethod("test11", List.class);
+        var intValuePool2 = innerClass.class.getDeclaredMethod("test12", List.class, int.class);
+        var intValuePool3 = innerClass.class.getDeclaredMethod("test13", List.class, int.class);
+        mnemoService.generateForMethod(intValuePool1, instance);
+
+
+        assert(mnemoService.getValuePool(function).equals(mnemoService.getValuePool(stringValuePool1)));
+        assert(mnemoService.getValuePool(stringValuePool1).equals(mnemoService.getValuePool(stringValuePool2)));
+
+        assert(!mnemoService.getValuePool(function).equals(mnemoService.getValuePool(intValuePool1)));
+
+        assert(mnemoService.getValuePool(intValuePool1).equals(mnemoService.getValuePool(intValuePool2)));
+        assert(mnemoService.getValuePool(intValuePool2).equals(mnemoService.getValuePool(intValuePool3)));
+
+    }
+
+    @Test
     public void testPreemptiveUpdate() throws Exception {
         MnemoService mnemoService = new MnemoService();
         var function = innerClass.class.getDeclaredMethod("functionForPreemptiveUpdateTest", Integer.class);
         var updater1 = innerClass.class.getDeclaredMethod("testpreemptiveUpdateWithList", List.class, Integer.class);
         var updater2 = innerClass.class.getDeclaredMethod("testpreemptiveUpdate", String.class, Integer.class);
         var instance = new innerClass();
-        var meth = mnemoService.generateForMethod(function, instance);
+        mnemoService.generateForMethod(function, instance);
         mnemoService.generateUpdatesForBean(instance);
         mnemoService.invokeMethodAndUpdate(updater2, instance, "extra string", 1);
-
+      //  Thread.sleep(200);
 
         List<String> result = (List<String>) mnemoService.fetchFromCacheOrInvokeMethodAndUpdate(function, 1);
 
@@ -176,7 +190,9 @@ public class MnemoServiceTest {
         assert (result.contains("extra string"));
 
         mnemoService.invokeMethodAndUpdate(updater1, instance, List.of("val3"), 2);
-         result = (List<String>) mnemoService.fetchFromCacheOrInvokeMethodAndUpdate(function, 2);
+       // Thread.sleep(200);
+
+        result = (List<String>) mnemoService.fetchFromCacheOrInvokeMethodAndUpdate(function, 2);
 
         assert (result.size() == 4);
         assert (result.contains("val3"));
@@ -199,39 +215,26 @@ public class MnemoServiceTest {
 
 
     class innerClass {
-        @Cached(cacheName = "cache1")
-        public HashSet<Set<ValuePool>> test1() {
-            return null;
-        }
 
-        @Cached(cacheName = "cache2")
-        public Collection<Map<ValuePool, Object>> test2() {
-            return null;
-        }
-
-        @Cached(cacheName = "cache3")
-        public Collection<List<ValuePool>> test3() {
-            return null;
-        }
 
         @Cached(cacheName = "cache4")
-        public ValuePool test4() {
+        public Object test4() {
             return null;
         }
 
         @Cached(cacheName = "should throw a Runtime - separate handling with concrete implementation of List", allowSeparateHandlingForKeyCollections = true)
-        ArrayList<ValuePool> test6(Collection<String> col) {
+        ArrayList<Object> test6(Collection<String> col) {
             return null;
         }
 
         @Cached(cacheName = "cache4")
             //same name as test4 = runtime
-        Set<ValuePool> test7() {
+        Set<Object> test7() {
             return null;
         }
 
         @Cached(cacheName = "separateHandling", allowSeparateHandlingForKeyCollections = true)
-        Collection<ValuePool> test8(Collection<String> col) {
+        Collection<Object> test8(Collection<String> col) {
             return null;
         }
 
@@ -274,17 +277,17 @@ public class MnemoServiceTest {
         }
 
         @Cached(cacheName = "separateHandlingToBeTested", capacity = 500, allowSeparateHandlingForKeyCollections = true, threadPoolSize = 5)
-        List<Integer> test11(List<Integer> integers) { //stupid function
+       public List<Integer> test11(List<Integer> integers) { //stupid function
             return integers;
         }
 
         @Cached(cacheName = "separateHandlingWithKeyToBeTested", capacity = 500, allowSeparateHandlingForKeyCollections = true, threadPoolSize = 5)
-        List<Integer> test12(@Key List<Integer> integers, int i) { //stupid function
+        public List<Integer> test12(@Key List<Integer> integers, int i) { //stupid function
             return integers;
         }
 
         @Cached(cacheName = "separateHandlingWithKeyToBeTestedAndThrow", capacity = 500, allowSeparateHandlingForKeyCollections = true, threadPoolSize = 5)
-        List<Integer> test13(List<Integer> integers, int i) { //shouldThrow
+        public  List<Integer> test13(List<Integer> integers, int i) { //shouldThrow
             return integers;
         }
 

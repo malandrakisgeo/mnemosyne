@@ -41,14 +41,12 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
      */
     final ConcurrentHashMap<ID, Integer> numberOfUsesById = new ConcurrentHashMap<ID, Integer>();
 
-    private int idsInCache = 0;
-
     public FIFOCache(CacheParameters parameters, ValuePool poolService) {
         super(parameters, poolService);
     }
 
     @Override
-    public void putAll(K key, Map<ID, T> map) {
+    public void putAll(K key, Collection<ID> map) {
         if (key == null || map == null || !returnsCollection) {
             return;
         }
@@ -58,7 +56,7 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
         }
         //We avoid iterative calls to put(), to avoid checking the keyIdMapper and concurrentFIFOQueue multiple times. One time suffices.
         var possibleValue = (CollectionIdWrapper<ID>) keyIdMapper.computeIfAbsent(key, k -> new CollectionIdWrapper<>());
-        possibleValue.addAllToCollectionOrUpdate(map.keySet());
+        possibleValue.addAllToCollectionOrUpdate(map);
 
         map.forEach(this::addOrUpdateIdAndValue);
 
@@ -68,7 +66,7 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
     }
 
     @Override
-    public void put(K key, ID id, T value) {
+    public void put(K key, ID id) {
         if (key == null || id == null) {
             return;
         }
@@ -84,7 +82,7 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
             if (idWrapper != null) {
                 var oldId = (ID) ((SingleIdWrapper) idWrapper).getId();
                 if (oldId.equals(id)) {
-                    valuePool.put(id, value, false); //just update the current value
+                    valuePool.put(id, false); //just update the current value
                     return;
                 }
                 removeOrDecreaseIdUses(oldId);
@@ -92,7 +90,7 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
             keyIdMapper.put(key, new SingleIdWrapper<ID>(id)); //if we used putIfAbsent, we would prevent the key from being updated with a brand new ID/value
         }
 
-        addOrUpdateIdAndValue(id, value);
+        addOrUpdateIdAndValue(id);
 
         if (!concurrentFIFOQueue.contains(key)) {
             concurrentFIFOQueue.add(key); //reminder that updates are not synonymous to accesses, and this is why we do not change the position in the queue on updating.
@@ -100,7 +98,7 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
     }
 
     @Override
-    public void putInAllCollections(ID id, T value) {
+    public void putInAllCollections(ID id) {
         if (!returnsCollection || handleCollectionKeysSeparately) {
             return;
         }
@@ -112,7 +110,7 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
                 numberOfUsesById.put(id, ++i);
             }
         }
-        valuePool.put(id, value, initialNumOfUses == 0);
+        valuePool.put(id, initialNumOfUses == 0);
     }
 
     @Override
@@ -181,7 +179,7 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
             return;
         }
         if (key == null) {
-            removeFromAllCollections(id);
+            removeById(List.of(id));
         } else {
             var cacheData = (CollectionIdWrapper) keyIdMapper.get(key);
             if (cacheData == null) {
@@ -189,24 +187,41 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
             }
             if (cacheData.getIds().remove(id)) {
                 removeOrDecreaseIdUses(id);
+                if(cacheData.getIds().isEmpty()){
+                    keyIdMapper.remove(key);
+                    concurrentFIFOQueue.remove(key);
+                }
             }
         }
     }
 
     @Override
-    public void removeFromAllCollections(ID id) {
-        if (!returnsCollection) {
-            return;
-        }
-        var relatedKeys = new HashSet<>();
-        for (K k : keyIdMapper.keySet()) {
-            var deleted = ((CollectionIdWrapper) keyIdMapper.get(k)).getIds().remove(id);
-            if (deleted) {
-                relatedKeys.add(k);
-                removeOrDecreaseIdUses(id);
+    public void removeById(Collection<ID> ids) {
+        var relatedKeys = new HashSet<K>();
+
+        for (ID id : ids) {
+            if (!returnsCollection) {
+                for (K k : keyIdMapper.keySet()) {
+                    if (((SingleIdWrapper) k).getId().equals(id)) {
+                        relatedKeys.add(k);
+                        removeOrDecreaseIdUses(id);
+                    }
+                }
+            } else {
+                for (K k : keyIdMapper.keySet()) {
+                    var savedIds = ((CollectionIdWrapper) keyIdMapper.get(k)).getIds();
+                    var deleted = savedIds.remove(id);
+                    if (deleted) {
+                        if (savedIds.isEmpty()) {
+                            relatedKeys.add(k);
+                        }
+                        removeOrDecreaseIdUses(id);
+                    }
+                }
             }
         }
-        if (handleCollectionKeysSeparately) { //on special collection handling, a key corresponds to at most one ID
+
+        if (handleCollectionKeysSeparately || !returnsCollection) { //on special collection handling, a key corresponds to at most one ID
             relatedKeys.forEach(k -> {
                 keyIdMapper.remove(k);
                 concurrentFIFOQueue.remove(k);
@@ -274,11 +289,11 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
         }
     }
 
-    private void addOrUpdateIdAndValue(ID id, T value) {
+    private void addOrUpdateIdAndValue(ID id) {
         var usesOfIdInCache = numberOfUsesById.getOrDefault(id, 0); //In non-collection caches, a key corresponds to just one object, but one object may be referenced to by many keys.
         var idAlreadyInCache = usesOfIdInCache > 0;
         numberOfUsesById.put(id, ++usesOfIdInCache);
-        valuePool.put(id, value, !idAlreadyInCache);
+        valuePool.put(id, !idAlreadyInCache);
     }
 
 }

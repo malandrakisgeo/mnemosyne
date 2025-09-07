@@ -12,10 +12,17 @@ public class CacheValue<T> {
     private long lastUpdated;
     private T value;
 
+
+    public CacheValue(T t, boolean addedPreemptively) {
+        createdOn = System.currentTimeMillis();
+        value = t;
+        cachesUsingValue = addedPreemptively ? 0 : 1; //manually increased or decreased afterwards by the ValuePool. We set it to zero if the CacheValue was created preemptively (i.e. not for a particular cache)
+    }
+
     public CacheValue(T t) {
         createdOn = System.currentTimeMillis();
         value = t;
-        cachesUsingValue = 1; //manually increased or decreased afterwards by the ValuePool
+        cachesUsingValue =  1; //manually increased or decreased afterwards by the ValuePool. We set it to zero if the CacheValue was created preemptively (i.e. not for a particular cache)
     }
 
     public synchronized int increaseNumberOfUses() {

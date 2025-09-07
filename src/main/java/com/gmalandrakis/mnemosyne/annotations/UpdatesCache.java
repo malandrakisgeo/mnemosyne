@@ -44,7 +44,7 @@ public @interface UpdatesCache {
      * public Transaction unrelatedCache(UUID uuid);
      *
      * @UpdatesCache(name="getTransactionByUUID", annotatedKeys={"uuid"})
-     * @UpdatesCache(name="getTransactionsByUser", annotatedKeys={"userId", "pending"}) //Could lead to a class-cast exception if it was {"pending", "userId"}, and would lead to silent cache discrepancies if both were Strings in the method!
+     * @UpdatesCache(name="getTransactionsByUser", annotatedKeys={"userId", "pending"}) //Could lead to a class-cast exception if it was {"pending", "userId"}, and would lead to silent cache discrepancies if both were Strings in the method and the ordering was wrong!
      * public Transaction createTransactionForUser(@UpdateKey(name="userId") String userId, @UpdateKey(name="pending") boolean pending, @UpdateKey UUID uuid)
      *
      * }
@@ -102,13 +102,28 @@ public @interface UpdatesCache {
      *       public void saveUserDetails(@UpdatedValue User newUser)
      *       }
      *       </pre>
+     * Set complementaryCondition to true if you expect a removal when the condition is false and the object is present in the cache.
      */
     String[] addOnCondition() default "";
 
     /**
      * Similar to addOnCondition.
+     * Set complementaryCondition to true if you expect an addition when the condition is false and the object is present in the cache.
      */
     String[] removeOnCondition() default "";
+
+    /**
+     * AddOnCondition is often complementary to removeOnCondition (i.e. "add to cache if A"  often implies "evict from cache if not A"), and vice versa.
+     * Setting complementaryCondition treats the inverse of the given condition for adding as a condition for removing, and vice versa.
+     * Example:
+     * <pre>
+     *       {@code
+     *       @UpdatesCache(name="getActiveUsers", addOnCondition={"isActive", "isVerified"}, conditionalANDGate = false, complementaryCondition = true) //removes from cache if isActive and isVerified are both false
+     *       public void saveActiveUserDetails(@UpdatedValue User newUser)
+     *       }
+     *       </pre>
+     */
+    boolean complementaryCondition() default false;
 
     /**
      * If set to true, all conditions in the addOnCondition and removeOnCondition have to be true in order for the new element to be added/removed.
@@ -190,3 +205,6 @@ public @interface UpdatesCache {
     }
 
 }
+//It seems possible to copy or move some of these functionalities to @Cached. This would reduce the number of annotations necessary.
+//Except for Cache Invalidation and edge cases where annotatedKeys are involved, the rest ought to be moved. Add/remove modes and conditions and target object keys for instance.
+//TODO: Check how feasible it is, and act accordingly

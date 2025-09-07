@@ -36,6 +36,30 @@ public class MnemoService {
     private final ConcurrentHashMap<String, MnemoProxy> cachesByName = new ConcurrentHashMap<>();
     private final ExecutorService threadPool = Executors.newCachedThreadPool();
 
+    public Object invokeMethodAndUpdateValuePool(Method method, Object obj, Object... args) {
+        Object object = null;
+        try {
+            object = method.invoke(obj, args);
+        } catch (IllegalAccessException | InvocationTargetException e) {
+            throw new RuntimeException(e);
+        }
+        Object updatedValue = getAnnotatedUpdatedValue(method.getParameterAnnotations(), args); // check if any of the args is annotated as @UpdatedValue.
+
+        if (updatedValue != null) {
+            object = updatedValue; // Which means that if there is any @UpdatedValue in the arguments, the result of the method is not used for updates!.
+        }
+        var id = GeneralUtils.deduceIdOrMap(object);
+
+        var annotation = method.getAnnotation(UpdatesValuePool.class);
+        assert (annotation != null);
+        if (id instanceof Map) {
+            updateValuePool(method, (Map) id, annotation.remove(), annotation.addIfAbsent());
+        } else {
+            updateValuePool(method, Map.of(id, object), annotation.remove(), annotation.addIfAbsent());
+        }
+        return object;
+    }
+
     public Object invokeMethodAndUpdate(Method method, Object obj, Object... args) {
         Object object = null;
         try {
@@ -43,10 +67,20 @@ public class MnemoService {
         } catch (IllegalAccessException | InvocationTargetException e) {
             throw new RuntimeException(e);
         }
-        Object finalObject = object;
-        // threadPool.execute(() -> {
-        updateRelatedCaches(method, finalObject, args); //TODO: Decide whether this should run in threadPool.execute to avoid delays
-        //}); //we don't want the updates to delay returning
+        Object updatedValue = getAnnotatedUpdatedValue(method.getParameterAnnotations(), args); // check if any of the args is annotated as @UpdatedValue.
+
+        if (updatedValue != null) {
+            object = updatedValue; // Which means that if there is any @UpdatedValue in the arguments, the result of the method is not used for updates!.
+        }
+        var id = GeneralUtils.deduceIdOrMap(object);
+        if (id instanceof Map) {
+            updateValuePool(method, (Map) id, false, false);
+            updateRelatedCaches(method, (Map) id, args);
+        } else {
+            updateValuePool(method, Map.of(id, object), false, false);
+            updateRelatedCaches(method, Map.of(id, object), args);
+        }
+
         return object;
     }
 
@@ -55,66 +89,97 @@ public class MnemoService {
         assert (cacheProxy != null);
         Object result = tryFetchFromCache(cacheProxy, args);
         if (result == null) {
-            result = cacheProxy.getFromUnderlyingMethodAndUpdateMainCache(args);
-            final var threadResult = result;
-            //threadPool.execute(() -> { //We want to update all related caches, without delaying returning
-            updateRelatedCaches(method, threadResult, args); // //TODO: Decide whether this should run in threadPool.execute to avoid delays
-            // });
+            var idValMap = cacheProxy.getFromUnderlyingMethodAndUpdateMainCache(args);
+            updateRelatedCaches(method, idValMap, args);
+            result = cacheProxy.deduce(idValMap);
         }
         return result;
     }
 
-    public void updateRelatedCaches(Method method, Object possibleUpdatedValue, Object... args) {
+    public void updateRelatedCaches(Method method, Map<?, ?> idValMap, Object... args) {
+        //   threadPool.execute(() -> {
         var updatesCaches = method.getAnnotation(UpdatesCaches.class);
-
         if (updatesCaches != null) {
             for (UpdatesCache updateCache : updatesCaches.value()) {
-                this.updateRelatedCache(updateCache, method, possibleUpdatedValue, args);
+                idValMap.forEach((id, v) -> {
+                    this.updateRelatedCache(updateCache, method.getParameterAnnotations(), id, v, args);
+                });
             }
-            return;
         }
         var updateCache = method.getAnnotation(UpdatesCache.class);
         if (updateCache != null) {
-            this.updateRelatedCache(updateCache, method, possibleUpdatedValue, args);
+            idValMap.forEach((id, v) -> {
+                this.updateRelatedCache(updateCache, method.getParameterAnnotations(), id, v, args);
+            });
         }
+        //    });
     }
 
     //TODO: Simplify the flow here
-    private void updateRelatedCache(UpdatesCache updateCache, Method invokedMethod, Object possibleUpdatedValue, Object... args) {
-        Object updatedValue = getAnnotatedUpdatedValue(invokedMethod, args); // check if any of the args is annotated as @UpdatedValue.
-
-        if (updatedValue == null) {
-            updatedValue = possibleUpdatedValue; // Which means that if there is any @UpdatedValue in the arguments, the result of the method is not used for updates!.
-        }
-
-        var idOfUpdatedValue = GeneralUtils.deduceId(updatedValue);
-        final Object finalUpdatedValue = updatedValue;
-
+    private void updateRelatedCache(UpdatesCache updateCache, Annotation[][] methodParameterAnnotations, Object idOfUpdatedValue, Object updatedValue, Object... args) {
+        var targetObjectKeyNamesAndValues = updateCache.targetObjectKeys();
         var cacheToBeUpdated = this.cachesByName.get(updateCache.name());
 
         assert (cacheToBeUpdated != null);
         var cachedMethod = cacheToBeUpdated.getCachedMethod();
+        var annotatedKeyNamesAndValues = getUpdateKeyNamesAndCorrespondingValues(methodParameterAnnotations, updateCache.annotatedKeys(), args);
 
-        var targetObjectKeyNamesAndValues = updateCache.targetObjectKeys();
-        var targetKeyNamesAndValues = linkTargetObjectKeysToObjects(List.of(targetObjectKeyNamesAndValues), finalUpdatedValue);
-        var annotatedKeyNamesAndValues = getUpdateKeyNamesAndCorrespondingValues(invokedMethod, updateCache.annotatedKeys(), args);
+        //final Object finalUpdatedValue = updatedValue;
 
-        var conditionalRemoval = getCondition(updateCache.removeOnCondition(), annotatedKeyNamesAndValues, updatedValue, updateCache.conditionalANDGate());
-        var conditionalAdd = getCondition(updateCache.addOnCondition(), annotatedKeyNamesAndValues, updatedValue, updateCache.conditionalANDGate());
+
+        var targetKeyNamesAndValues = linkTargetObjectKeysToObjects(List.of(targetObjectKeyNamesAndValues), updatedValue);
+
+        var explicitRemovalOnCondition = getCondition(updateCache.removeOnCondition(), annotatedKeyNamesAndValues, updatedValue, updateCache.conditionalANDGate());
+        var explicitAddOnCondition = getCondition(updateCache.addOnCondition(), annotatedKeyNamesAndValues, updatedValue, updateCache.conditionalANDGate());
+        var implicitRemoval = updateCache.complementaryCondition() && !explicitAddOnCondition;
+        var implicitAdd = updateCache.complementaryCondition() && !explicitRemovalOnCondition;
+
+        var removeMode = updateCache.removeMode();
+        if(removeMode == UpdatesCache.RemoveMode.NONE && implicitRemoval){
+            removeMode = UpdatesCache.RemoveMode.values()[updateCache.addMode().ordinal()];
+        }
+
         var key = getCompoundKeyForUpdate(annotatedKeyNamesAndValues, targetKeyNamesAndValues, updateCache.keyOrder(), cachedMethod, cacheToBeUpdated.isSpecialCollectionHandlingEnabled());
 
         if (idOfUpdatedValue == null && updatedValue == null) { //this can only happen on key removal.
-            cacheToBeUpdated.updateByRemoving(key, null, conditionalRemoval, updateCache.removeMode());
+            cacheToBeUpdated.updateByRemoving(key, null, explicitRemovalOnCondition, removeMode);
             return;
         }
-        if (idOfUpdatedValue instanceof Map) {
-            cacheToBeUpdated.updateByRemoving(key, (Map) idOfUpdatedValue, conditionalRemoval, updateCache.removeMode());
-            cacheToBeUpdated.updateByAdding(key, (Map) idOfUpdatedValue, conditionalAdd, updateCache.addMode());
+        if (idOfUpdatedValue instanceof Map) { //This should be impossible with the new flow. TODO: Test and verify, and remove if so
+            cacheToBeUpdated.updateByRemoving(key, (Map) idOfUpdatedValue, explicitRemovalOnCondition || implicitRemoval, removeMode);
+            cacheToBeUpdated.updateByAdding(key, (Map) idOfUpdatedValue, explicitAddOnCondition || implicitAdd, updateCache.addMode());
 
         } else {
-            cacheToBeUpdated.updateByRemoving(key, Map.of(idOfUpdatedValue, updatedValue), conditionalRemoval, updateCache.removeMode());
-            cacheToBeUpdated.updateByAdding(key, Map.of(idOfUpdatedValue, updatedValue), conditionalAdd, updateCache.addMode());
+            cacheToBeUpdated.updateByRemoving(key, Map.of(idOfUpdatedValue, updatedValue), explicitRemovalOnCondition || implicitRemoval, removeMode);
+            cacheToBeUpdated.updateByAdding(key, Map.of(idOfUpdatedValue, updatedValue), explicitAddOnCondition || implicitAdd, updateCache.addMode());
         }
+    }
+
+    private void updateValuePool(Method invokedMethod, Map<?, ?> idObjectMap, boolean remove, boolean addIfAbsent) {
+        if (idObjectMap == null) {
+            return;
+        }
+        var vp = getValuePool(invokedMethod);
+
+        if (remove) {
+            var ids = idObjectMap.keySet();
+
+            proxies.values().forEach(p -> {
+                p.cache.removeById(ids); //will be removed from valuepool via the local caches, along with the ID from them.
+            });
+        } else {
+            idObjectMap.forEach((id, v) -> {
+                if (v != null) { //TODO: This should not be possible Verify it indeed isn't.
+                    if (addIfAbsent) {
+                        vp.put(id, v, true);
+                        return;
+                    }
+                    vp.updateValueOrPutPreemptively(id, v);
+                }
+            });
+
+        }
+
     }
 
     public List<MnemoProxy> generateCachesForBean(Object singletonBean) {
@@ -153,31 +218,46 @@ public class MnemoService {
         return cacheProxy.getFromCache(args);
     }
 
-    ValuePool createValuePool(Method method) {
+    //TODO: Unit test
+    ValuePool getValuePool(Method method) {
+        var cleanType = GeneralUtils.updateType(method);
+
+        var vp = valuePoolConcurrentHashMap.get(cleanType);
+        if (vp == null) {
+            throw new MnemosyneRuntimeException("Value pool not found for method " + method.getName());
+        }
+        return vp;
+    }
+
+
+    ValuePool getOrCreateValuePool(Method method) {
+        var cleanType = getCleanType(method);
+        return valuePoolConcurrentHashMap.computeIfAbsent(cleanType, k -> new ValuePool<>());
+    }
+
+    private String getCleanType(Method method) {
+
         var methodDescription = method.toGenericString(); //!!!!!!
         methodDescription = methodDescription.replace("private ", "").replace("protected ", "").replace("public ", ""); //terralol, TODO find some less cringy way to achieve this
-
         try {
             if (methodDescription.contains("<")) { //i.e. any collection (maps are not allowed)
                 var firstSplit = methodDescription.split(" ");
                 var secondSplit = firstSplit[0].split("<");
                 var cleanType = secondSplit[secondSplit.length - 1].replace(">", "").replace("<", "").replace(",", "");
-                return valuePoolConcurrentHashMap.computeIfAbsent(cleanType, k -> new ValuePool<>());
-
+                return cleanType;
             } else {
                 var split = methodDescription.split(" ");
                 var cleanType = split[0].replace(" ", "");
-                return valuePoolConcurrentHashMap.computeIfAbsent(cleanType, k -> new ValuePool<>());
+                return cleanType;
             }
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-
     }
 
     private Boolean getCondition(String[] conditions, Map<String, Object> annotatedKeyNamesAndValues, Object updatedObject, boolean conditionalAND) {
         if (conditions == null || (conditions.length == 1 && conditions[0].isEmpty())) {
-            return null;
+            return true; //If there is no condition, we tell mnemosyne "just add or remove the value without caring about it's fields"
         }
 
         List<Boolean> booleans = new ArrayList<>();
@@ -227,7 +307,7 @@ public class MnemoService {
         generalControls(method, cacheParams);
 
         Class<? extends AbstractMnemosyneCache> algoClass = cacheParams.getCacheType();
-        ValuePool valuePool = createValuePool(method);
+        ValuePool valuePool = getOrCreateValuePool(method);
         AbstractMnemosyneCache cache = null;
         try {
             cache = algoClass.getDeclaredConstructor(CacheParameters.class, ValuePool.class).newInstance(cacheParams, valuePool);
@@ -249,7 +329,9 @@ public class MnemoService {
         if (returnType.equals(Void.TYPE) && method.getAnnotation(Cached.class) != null) {
             throw new MnemosyneInitializationException("Void methods cannot be cached."); //TODO: Testfall
         }
-
+        if ((method.getAnnotation(Cached.class) != null || method.getAnnotation(UpdatesCache.class) != null) && method.getAnnotation(UpdatesValuePool.class) != null) {
+            throw new MnemosyneInitializationException("@UpdatesValuePool may only be used by methods that do not otherwise interact with mnemosyne");
+        }
         if (cachesByName.get(parameters.getCacheName()) != null) {
             throw new MnemosyneInitializationException("Cache with the same name already exists!");
         }
@@ -316,11 +398,11 @@ public class MnemoService {
     }
 
 
-    private Object getAnnotatedUpdatedValue(Method method, Object[] args) {
-        var paramannot = method.getParameterAnnotations();
+    private Object getAnnotatedUpdatedValue(Annotation[][] parameterAnnotations, Object[] args) {
+        // var paramannot = method.getParameterAnnotations();
 
         int i = 0;
-        for (Annotation[] annotations : paramannot) {
+        for (Annotation[] annotations : parameterAnnotations) {
             for (Annotation annotation : annotations) {
                 if (annotation.annotationType() == UpdatedValue.class) {
                     return args[i];
@@ -370,8 +452,8 @@ public class MnemoService {
             boolean keyIsASet = false;
             boolean keyIsAList = false;
             if (cachedMethod.getParameters().length == 1) {
-                keyIsASet = Set.class.isAssignableFrom(cachedMethod.getParameters()[0].getType())  && !specialHandling; //special collection handling internally uses only the values each by each, without wrapping them as Sets or Lists.
-                keyIsAList = List.class.isAssignableFrom(cachedMethod.getParameters()[0].getType())  && !specialHandling;
+                keyIsASet = Set.class.isAssignableFrom(cachedMethod.getParameters()[0].getType()) && !specialHandling; //special collection handling internally uses only the values each by each, without wrapping them as Sets or Lists.
+                keyIsAList = List.class.isAssignableFrom(cachedMethod.getParameters()[0].getType()) && !specialHandling;
             }
             /*
                 The reason for the code below is that a CompoundKey that contains an object A is different from a compoundKey containing a List or a Set with an object A.
@@ -390,7 +472,7 @@ public class MnemoService {
                     }
                 }
                 keyObjects.add(hashSet);
-            }else if (keyIsAList) {
+            } else if (keyIsAList) {
                 for (LinkedHashMap linkedHashMap : linkedHashMaps) {
                     if (linkedHashMap != null) {
                         linkedHashMap.keySet().forEach(keyName -> {
@@ -399,7 +481,7 @@ public class MnemoService {
                     }
                 }
                 keyObjects.add(arrayList);
-            }else{
+            } else {
                 for (LinkedHashMap linkedHashMap : linkedHashMaps) {
                     if (linkedHashMap != null) {
                         linkedHashMap.keySet().forEach(keyName -> {
@@ -413,8 +495,7 @@ public class MnemoService {
         return new CompoundKey(keyObjects.toArray());
     }
 
-    private LinkedHashMap<String, Object> getUpdateKeyNamesAndCorrespondingValues(Method method, String[] keyNames, Object[] args) {
-        var parameterAnnotations = method.getParameterAnnotations();
+    private LinkedHashMap<String, Object> getUpdateKeyNamesAndCorrespondingValues(Annotation[][] parameterAnnotations, String[] keyNames, Object[] args) {
         var keyNameAndValue = new LinkedHashMap<String, Object>();
         int i = 0;
 

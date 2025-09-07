@@ -12,6 +12,7 @@ import java.util.stream.Collectors;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
 public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
+
     final ConcurrentHashMap<ID, Integer> numberOfUsesById = new ConcurrentHashMap<ID, Integer>();
 
     public LRUCache(CacheParameters cacheParameters, ValuePool poolService) {
@@ -21,7 +22,7 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
     }
 
     @Override
-    public void putAll(K key, Map<ID, T> map) {
+    public void putAll(K key, Collection<ID> map) {
         if (key == null || map == null || !returnsCollection) {
             return;
         }
@@ -31,14 +32,14 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
         //We avoid iterative calls to put(), to avoid checking the keyIdMapper multiple times. One time suffices.
         synchronized (keyIdMapper) {
             var possibleValue = (CollectionIdWrapper<ID>) keyIdMapper.computeIfAbsent(key, k -> new CollectionIdWrapper<>());
-            possibleValue.addAllToCollectionOrUpdate(map.keySet());
+            possibleValue.addAllToCollectionOrUpdate(map);
         }
 
         map.forEach(this::addOrUpdateIdAndValue);
     }
 
     @Override
-    public void putInAllCollections(ID id, T value) {
+    public void putInAllCollections(ID id) {
         if (!returnsCollection || handleCollectionKeysSeparately) {
             return;
         }
@@ -52,11 +53,11 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
                 }
             }
         }
-        valuePool.put(id, value, initialNumOfUses == 0);
+        valuePool.put(id, initialNumOfUses == 0);
     }
 
     @Override
-    public void put(K key, ID id, T value) {
+    public void put(K key, ID id) {
         if (key == null || id == null) {
             return;
         }
@@ -73,7 +74,7 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
                 if (idWrapper != null) {
                     var oldId = (ID) ((SingleIdWrapper) idWrapper).getId();
                     if (oldId.equals(id)) {
-                        valuePool.put(id, value, false); //just update the current value
+                        valuePool.put(id, false); //just update the current value
                         return;
                     }
                     removeOrDecreaseIdUses(oldId);
@@ -81,7 +82,7 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
                 keyIdMapper.put(key, new SingleIdWrapper<ID>(id)); //if we used putIfAbsent, we would prevent the key from being updated with a brand new ID/value
             }
         }
-        addOrUpdateIdAndValue(id, value);
+        addOrUpdateIdAndValue(id);
 
     }
 
@@ -158,7 +159,7 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
             return;
         }
         if (key == null) {
-            removeFromAllCollections(id);
+            removeById(List.of(id));
         } else {
             CollectionIdWrapper<ID> cacheData;
 
@@ -171,31 +172,12 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
             if (cacheData.getIds().remove(id)) {
                 removeOrDecreaseIdUses(id);
             }
-        }
-    }
-
-    @Override
-    public void removeFromAllCollections(ID id) {
-        if (!returnsCollection) {
-            return;
-        }
-        var relatedKeys = new HashSet<>();
-        synchronized (keyIdMapper) {
-            for (K k : keyIdMapper.keySet()) {
-                var deleted = ((CollectionIdWrapper) keyIdMapper.get(k)).getIds().remove(id);
-                if (deleted) {
-                    relatedKeys.add(k);
-                    removeOrDecreaseIdUses(id);
-                }
-            }
-
-            if (handleCollectionKeysSeparately) { //on special collection handling, a key corresponds to at most one ID
-                relatedKeys.forEach(k -> {
-                    keyIdMapper.remove(k);
-                });
+            if (cacheData.getIds().isEmpty()) {
+                keyIdMapper.remove(key);
             }
         }
     }
+
 
     @Override
     public String getAlgorithmName() {
@@ -211,7 +193,7 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
     public void evict() {
         if (timeToLive != Long.MAX_VALUE && timeToLive > 0) {
             Set<K> expiredValues;
-            synchronized (keyIdMapper){
+            synchronized (keyIdMapper) {
                 expiredValues = keyIdMapper.entrySet().stream().filter(this::isExpired).map(Map.Entry::getKey).collect(Collectors.toSet());
             }
             expiredValues.forEach(this::remove);
@@ -232,7 +214,7 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
     @Override
     public void invalidateCache() {
         List<K> keyList;
-        synchronized (keyIdMapper){
+        synchronized (keyIdMapper) {
             keyList = keyIdMapper.keySet().stream().toList();
         }
         for (K k : keyList) {
@@ -247,6 +229,39 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
         return numberOfCollectionsUsingIt != null && numberOfCollectionsUsingIt > 0;
     }
 
+    @Override
+    public void removeById(Collection<ID> ids) {
+        var relatedKeys = new HashSet<K>();
+
+        for (ID id : ids) {
+            if (!returnsCollection) {
+                for (K k : keyIdMapper.keySet()) {
+                    if (((SingleIdWrapper) k).getId().equals(id)) {
+                        relatedKeys.add(k);
+                        removeOrDecreaseIdUses(id);
+                    }
+                }
+            } else {
+                for (K k : keyIdMapper.keySet()) {
+                    var savedIds = ((CollectionIdWrapper) keyIdMapper.get(k)).getIds();
+                    var deleted = savedIds.remove(id);
+                    if (deleted) {
+                        if (savedIds.isEmpty()) {
+                            relatedKeys.add(k);
+                        }
+                        removeOrDecreaseIdUses(id);
+                    }
+                }
+            }
+        }
+
+        if (handleCollectionKeysSeparately || !returnsCollection) { //on special collection handling, a key corresponds to at most one ID
+            relatedKeys.forEach(k -> {
+                keyIdMapper.remove(k);
+            });
+        }
+    }
+
 
     private void removeOrDecreaseIdUses(ID id) {
         var numOfCollectionsUsingId = numberOfUsesById.getOrDefault(id, 0) - 1;
@@ -258,10 +273,10 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
         }
     }
 
-    private void addOrUpdateIdAndValue(ID id, T value) {
+    private void addOrUpdateIdAndValue(ID id) {
         var usesOfIdInCache = numberOfUsesById.getOrDefault(id, 0); //In non-collection caches, a key corresponds to just one object, but one object may be referenced to by many keys.
         var idAlreadyInCache = usesOfIdInCache > 0;
         numberOfUsesById.put(id, ++usesOfIdInCache);
-        valuePool.put(id, value, !idAlreadyInCache);
+        valuePool.put(id, !idAlreadyInCache);
     }
 }
