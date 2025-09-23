@@ -1,11 +1,11 @@
 package com.gmalandrakis.mnemosyne.core;
 
-import com.gmalandrakis.mnemosyne.annotations.UpdatesCache.RemoveMode;
-import com.gmalandrakis.mnemosyne.annotations.UpdatesCache.AddMode;
-
+import com.gmalandrakis.mnemosyne.annotations.Cached;
 import com.gmalandrakis.mnemosyne.cache.AbstractGenericCache;
 import com.gmalandrakis.mnemosyne.cache.AbstractMnemosyneCache;
+import com.gmalandrakis.mnemosyne.structures.AddMode;
 import com.gmalandrakis.mnemosyne.structures.CompoundKey;
+import com.gmalandrakis.mnemosyne.structures.RemoveMode;
 import com.gmalandrakis.mnemosyne.utils.GeneralUtils;
 
 import java.lang.reflect.InvocationTargetException;
@@ -54,6 +54,10 @@ public class MnemoProxy<K, ID, V> {
         this.specialCollectionHandlingEnabled = specialCollectionHandling;
     }
 
+    Cached getAnnotation(){
+        return cachedMethod.getAnnotation(Cached.class);
+    }
+
 
     Object getFromCache(Object... args) {
         var compoundKey = GeneralUtils.deduceCompoundKeyFromMethodAndArgs(cachedMethod, args);
@@ -85,10 +89,10 @@ public class MnemoProxy<K, ID, V> {
         }
     }
 
-    public Object deduce(Map<ID, V> res) {
+    Object deduce(Map<ID, V> res) {
         if (res != null && res.size() != 0) {
             if (!returnsCollections) {
-                return res.get(List.of(res.keySet()).get(0));
+                return res.values().stream().toList().get(0);
             } else {
                 if (List.class.isAssignableFrom(cachedMethod.getReturnType())) {
                     return res.values().stream().collect(Collectors.toList());
@@ -108,15 +112,15 @@ public class MnemoProxy<K, ID, V> {
     void updateByRemoving(K key, Map<ID, V> idValueMap, Boolean conditionalRemove, RemoveMode removeMode) {
         if (removeMode != RemoveMode.NONE && (conditionalRemove == null || conditionalRemove)) {
 
-            if (key != null && removeMode.equals(RemoveMode.DEFAULT) || idValueMap == null) {
+            if (key != null && removeMode.equals(RemoveMode.SINGLE_VALUE) || idValueMap == null) {
                 cache.remove(key);
                 return;
             }
 
             if (returnsCollections) {
-                if (removeMode.equals(RemoveMode.REMOVE_VALUE_FROM_COLLECTION)) {
+                if (removeMode.equals(RemoveMode.REMOVE_FROM_COLLECTION)) {
                     idValueMap.keySet().forEach(id -> cache.removeOneFromCollection(key, id));
-                } else if (removeMode.equals(RemoveMode.REMOVE_VALUE_FROM_ALL_COLLECTIONS)) {
+                } else if (removeMode.equals(RemoveMode.REMOVE_FROM_ALL_COLLECTIONS)) {
                     cache.removeById(idValueMap.keySet());//o prwtos pou tha mou steilei email gia auto to sxolio lamvanei pente evrw.
                 }
             }
@@ -131,8 +135,8 @@ public class MnemoProxy<K, ID, V> {
     void updateByAdding(K key, Map<ID, V> idValueMap, Boolean conditionalAdd, AddMode addMode) {
         if (addMode != AddMode.NONE && (conditionalAdd == null || conditionalAdd)) {
 
-            if (addMode == AddMode.DEFAULT) {
-                cache.remove(key);
+            if (addMode == AddMode.SINGLE_VALUE) {
+                //cache.remove(key);
                 if (returnsCollections) {
                     if (!specialCollectionHandlingEnabled) {
                         preemptiveAdd(key, idValueMap.keySet()); //Crudely written. TODO: Improve or remove. Perhaps allow the user to decide if the preemptive add happens?
@@ -144,7 +148,7 @@ public class MnemoProxy<K, ID, V> {
                 }
             }
 
-            if (addMode == AddMode.ADD_VALUES_TO_COLLECTION) {
+            if (addMode == AddMode.ADD_TO_COLLECTION) {
                 if (returnsCollections) {
                     if (!specialCollectionHandlingEnabled) {
                         preemptiveAdd(key, idValueMap.keySet());
@@ -153,7 +157,7 @@ public class MnemoProxy<K, ID, V> {
                 cache.putAll(key, idValueMap.keySet());
             }
 
-            if (addMode == AddMode.ADD_VALUES_TO_ALL_COLLECTIONS) {
+            if (addMode == AddMode.ADD_TO_ALL_COLLECTIONS) {
                 idValueMap.keySet().forEach(cache::putInAllCollections);
             }
 

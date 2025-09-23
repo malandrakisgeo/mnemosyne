@@ -5,8 +5,10 @@ import com.gmalandrakis.mnemosyne.cache.AbstractMnemosyneCache;
 import com.gmalandrakis.mnemosyne.exception.MnemosyneInitializationException;
 import com.gmalandrakis.mnemosyne.exception.MnemosyneRuntimeException;
 import com.gmalandrakis.mnemosyne.exception.MnemosyneUpdateException;
+import com.gmalandrakis.mnemosyne.structures.AddMode;
 import com.gmalandrakis.mnemosyne.structures.CacheParameters;
 import com.gmalandrakis.mnemosyne.structures.CompoundKey;
+import com.gmalandrakis.mnemosyne.structures.RemoveMode;
 import com.gmalandrakis.mnemosyne.utils.GeneralUtils;
 
 import java.lang.annotation.Annotation;
@@ -30,6 +32,7 @@ import static com.gmalandrakis.mnemosyne.utils.ParameterUtils.annotationValuesTo
  */
 @SuppressWarnings({"unchecked", "rawtypes"})
 public class MnemoService {
+    private final ConcurrentHashMap<ValuePool, List<MnemoProxy>> proxiesByValuePool = new ConcurrentHashMap<>(); //pools by fully qualified object name
 
     private final ConcurrentHashMap<String, ValuePool> valuePoolConcurrentHashMap = new ConcurrentHashMap<>(); //pools by fully qualified object name
     private final ConcurrentHashMap<Method, MnemoProxy> proxies = new ConcurrentHashMap<>();
@@ -52,10 +55,18 @@ public class MnemoService {
 
         var annotation = method.getAnnotation(UpdatesValuePool.class);
         assert (annotation != null);
+        //Update the value pool with latest version of the object (or remove it, along with all the IDs from the proxies)
         if (id instanceof Map) {
             updateValuePool(method, (Map) id, annotation.remove(), annotation.addIfAbsent());
         } else {
             updateValuePool(method, Map.of(id, object), annotation.remove(), annotation.addIfAbsent());
+        }
+        var vp = getValuePool(method);
+        var v = proxiesByValuePool.get(vp);
+        if (v != null && !v.isEmpty() && !annotation.remove()) { //If we remove, we remove via updateValuePool.
+            for (MnemoProxy mnemoProxy : v) {
+                updateCacheViaValuepoolUpdate(mnemoProxy, id, object); //Otherwise, we add/update on conditions
+            }
         }
         return object;
     }
@@ -102,30 +113,69 @@ public class MnemoService {
         if (updatesCaches != null) {
             for (UpdatesCache updateCache : updatesCaches.value()) {
                 idValMap.forEach((id, v) -> {
-                    this.updateRelatedCache(updateCache, method.getParameterAnnotations(), id, v, args);
+                    this.updateCacheViaAnnotation(updateCache, method.getParameterAnnotations(), id, v, args);
                 });
             }
         }
         var updateCache = method.getAnnotation(UpdatesCache.class);
         if (updateCache != null) {
             idValMap.forEach((id, v) -> {
-                this.updateRelatedCache(updateCache, method.getParameterAnnotations(), id, v, args);
+                this.updateCacheViaAnnotation(updateCache, method.getParameterAnnotations(), id, v, args);
             });
         }
         //    });
     }
 
-    //TODO: Simplify the flow here
-    private void updateRelatedCache(UpdatesCache updateCache, Annotation[][] methodParameterAnnotations, Object idOfUpdatedValue, Object updatedValue, Object... args) {
+    private void updateCacheViaValuepoolUpdate(MnemoProxy cacheToBeUpdated, Object idOfUpdatedValue, Object updatedValue) {
+        Cached updateCache = cacheToBeUpdated.getAnnotation();
+        if (updateCache == null) {
+            throw new MnemosyneRuntimeException("@Cached annotation not found");
+        }
         var targetObjectKeyNamesAndValues = updateCache.targetObjectKeys();
-        var cacheToBeUpdated = this.cachesByName.get(updateCache.name());
 
         assert (cacheToBeUpdated != null);
         var cachedMethod = cacheToBeUpdated.getCachedMethod();
+
+        var targetKeyNamesAndValues = linkTargetObjectKeysToObjects(List.of(targetObjectKeyNamesAndValues), updatedValue);
+
+        var explicitRemovalOnCondition = getCondition(updateCache.removeOnCondition(), Map.of(), updatedValue, updateCache.conditionalANDGate());
+        var explicitAddOnCondition = getCondition(updateCache.addOnCondition(), Map.of(), updatedValue, updateCache.conditionalANDGate());
+        var implicitRemoval = updateCache.complementaryCondition() && !explicitAddOnCondition;
+        var implicitAdd = updateCache.complementaryCondition() && !explicitRemovalOnCondition;
+
+        var removeMode = updateCache.removeMode();
+        if (removeMode == RemoveMode.NONE && implicitRemoval) {
+            removeMode = RemoveMode.values()[updateCache.addMode().ordinal()];
+        }
+
+        var addMode = updateCache.addMode();
+        if (addMode == AddMode.NONE && implicitAdd) {
+            addMode = AddMode.values()[updateCache.removeMode().ordinal()];
+        }
+
+        var key = getCompoundKeyForUpdate(null, targetKeyNamesAndValues, null, cachedMethod, cacheToBeUpdated.isSpecialCollectionHandlingEnabled());
+
+        commonUpdater(cacheToBeUpdated, idOfUpdatedValue, updatedValue, key,
+                explicitAddOnCondition || implicitAdd, explicitRemovalOnCondition || implicitRemoval,
+                addMode, removeMode);
+    }
+
+    //TODO: Simplify the flow here
+    private void updateCacheViaAnnotation(UpdatesCache updateCache, Annotation[][] methodParameterAnnotations, Object idOfUpdatedValue, Object updatedValue, Object... args) {
+        RemoveMode removeMode = updateCache.removeMode();
+        AddMode addMode = updateCache.addMode();
+        MnemoProxy cacheToBeUpdated = this.cachesByName.get(updateCache.name());
+        var cachedMethod = cacheToBeUpdated.getCachedMethod();
+
+        if (addMode == AddMode.NONE && removeMode == RemoveMode.NONE) { //if none are set, use the underlying cache's
+            //Note how we don't do the same if only one of them is set to NONE: we use the implicit conditions in that case
+            removeMode = cachedMethod.getAnnotation(Cached.class).removeMode();
+            addMode =  cachedMethod.getAnnotation(Cached.class).addMode();
+        }
+        String[] targetObjectKeyNamesAndValues = updateCache.targetObjectKeys();
+
+        assert (cacheToBeUpdated != null);
         var annotatedKeyNamesAndValues = getUpdateKeyNamesAndCorrespondingValues(methodParameterAnnotations, updateCache.annotatedKeys(), args);
-
-        //final Object finalUpdatedValue = updatedValue;
-
 
         var targetKeyNamesAndValues = linkTargetObjectKeysToObjects(List.of(targetObjectKeyNamesAndValues), updatedValue);
 
@@ -134,24 +184,45 @@ public class MnemoService {
         var implicitRemoval = updateCache.complementaryCondition() && !explicitAddOnCondition;
         var implicitAdd = updateCache.complementaryCondition() && !explicitRemovalOnCondition;
 
-        var removeMode = updateCache.removeMode();
-        if(removeMode == UpdatesCache.RemoveMode.NONE && implicitRemoval){
-            removeMode = UpdatesCache.RemoveMode.values()[updateCache.addMode().ordinal()];
+
+        if (removeMode == RemoveMode.NONE) {
+            if (implicitRemoval) {
+                removeMode = RemoveMode.values()[updateCache.addMode().ordinal()];
+            } else {
+                removeMode = cachedMethod.getAnnotation(Cached.class).removeMode(); //TODO: What about the implicit removal in the cache? Is this even actually needed?
+            }
+        }
+
+
+        if (addMode == AddMode.NONE) {
+            if (implicitAdd) {
+                addMode = AddMode.values()[updateCache.removeMode().ordinal()];
+            } else {
+                addMode = cachedMethod.getAnnotation(Cached.class).addMode();
+            }
         }
 
         var key = getCompoundKeyForUpdate(annotatedKeyNamesAndValues, targetKeyNamesAndValues, updateCache.keyOrder(), cachedMethod, cacheToBeUpdated.isSpecialCollectionHandlingEnabled());
 
+        commonUpdater(cacheToBeUpdated, idOfUpdatedValue, updatedValue, key,
+                explicitAddOnCondition || implicitAdd, explicitRemovalOnCondition || implicitRemoval,
+                addMode, removeMode);
+    }
+
+    private void commonUpdater(MnemoProxy cacheToBeUpdated, Object idOfUpdatedValue,
+                               Object updatedValue, CompoundKey key,
+                               boolean add, boolean remove,
+                               AddMode addMode, RemoveMode removeMode) {
         if (idOfUpdatedValue == null && updatedValue == null) { //this can only happen on key removal.
-            cacheToBeUpdated.updateByRemoving(key, null, explicitRemovalOnCondition, removeMode);
+            cacheToBeUpdated.updateByRemoving(key, null, add, removeMode);
             return;
         }
         if (idOfUpdatedValue instanceof Map) { //This should be impossible with the new flow. TODO: Test and verify, and remove if so
-            cacheToBeUpdated.updateByRemoving(key, (Map) idOfUpdatedValue, explicitRemovalOnCondition || implicitRemoval, removeMode);
-            cacheToBeUpdated.updateByAdding(key, (Map) idOfUpdatedValue, explicitAddOnCondition || implicitAdd, updateCache.addMode());
-
+            cacheToBeUpdated.updateByRemoving(key, (Map) idOfUpdatedValue, remove, removeMode);
+            cacheToBeUpdated.updateByAdding(key, (Map) idOfUpdatedValue, add, addMode);
         } else {
-            cacheToBeUpdated.updateByRemoving(key, Map.of(idOfUpdatedValue, updatedValue), explicitRemovalOnCondition || implicitRemoval, removeMode);
-            cacheToBeUpdated.updateByAdding(key, Map.of(idOfUpdatedValue, updatedValue), explicitAddOnCondition || implicitAdd, updateCache.addMode());
+            cacheToBeUpdated.updateByRemoving(key, Map.of(idOfUpdatedValue, updatedValue), remove, removeMode);
+            cacheToBeUpdated.updateByAdding(key, Map.of(idOfUpdatedValue, updatedValue), add, addMode);
         }
     }
 
@@ -232,7 +303,9 @@ public class MnemoService {
 
     ValuePool getOrCreateValuePool(Method method) {
         var cleanType = getCleanType(method);
-        return valuePoolConcurrentHashMap.computeIfAbsent(cleanType, k -> new ValuePool<>());
+        var vp = valuePoolConcurrentHashMap.computeIfAbsent(cleanType, k -> new ValuePool<>());
+
+        return vp;
     }
 
     private String getCleanType(Method method) {
@@ -317,6 +390,9 @@ public class MnemoService {
         var proxyService = new MnemoProxy<>(cache, method, singletonBean, valuePool, returnsCollection, handleCollectionKeysSeparately);
 
         proxies.put(method, proxyService);
+        var proxyList = proxiesByValuePool.getOrDefault(valuePool, new ArrayList<>());
+        proxyList.add(proxyService);
+        proxiesByValuePool.put(valuePool, proxyList);
         cachesByName.put(annotation.cacheName(), proxyService);
 
         return proxyService;
@@ -367,11 +443,11 @@ public class MnemoService {
                 throw new MnemosyneUpdateException("At most one UpdatedValue allowed");
             }
 
-            if (updateCache.removeMode() == UpdatesCache.RemoveMode.NONE && updateCache.addMode() == UpdatesCache.AddMode.NONE) {
+            if (updateCache.removeMode() == RemoveMode.NONE && updateCache.addMode() == AddMode.NONE) {
                 throw new MnemosyneUpdateException("Invalid update mode: make sure you chose the proper RemoveMode or AddMode.");
             }
 
-            if (updateCache.removeMode() != UpdatesCache.RemoveMode.NONE && updateCache.addMode() != UpdatesCache.AddMode.NONE) {
+            if (updateCache.removeMode() != RemoveMode.NONE && updateCache.addMode() != AddMode.NONE) {
                 var condAdd = updateCache.addOnCondition();
                 var condRem = updateCache.removeOnCondition();
                 if (condAdd.length == 1 && condAdd[0].isEmpty() && condRem.length == 1 && condRem[0].isEmpty()) {

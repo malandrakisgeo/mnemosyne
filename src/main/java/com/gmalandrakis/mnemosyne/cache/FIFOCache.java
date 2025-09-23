@@ -202,7 +202,7 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
         for (ID id : ids) {
             if (!returnsCollection) {
                 for (K k : keyIdMapper.keySet()) {
-                    if (((SingleIdWrapper) k).getId().equals(id)) {
+                    if (((SingleIdWrapper) keyIdMapper.get(k)).getId().equals(id)) {
                         relatedKeys.add(k);
                         removeOrDecreaseIdUses(id);
                     }

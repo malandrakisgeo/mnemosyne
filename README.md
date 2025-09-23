@@ -1,4 +1,4 @@
-### The project is under development and testing as of 8/2025.
+### The project is under development and testing as of 9/2025.
 
 # Mnemosyne
 Mnemosyne is a small and customizable cache library for Java applications.
@@ -132,29 +132,33 @@ You can then create a cache by just using an annotation on any Singleton object.
 The caches can then be created with annotations above
 the methods to be cached, as you see in the examples below:
 
-    @Cached(cacheName = "transactionCache", capacity = 5000, timeToLive = 24 * 3600 * 1000, countdownFromCreation = true, cacheType = FIFOCache.class)
+    @UpdatesValuePool(remove = true)
+    public void deleteTransaction(Transaction transaction);
+
+    @Cached(cacheName = "transactionCache", , targetObjectKeys={"id"}, addMode = AddMode.DEFAULT,
+    capacity = 5000, timeToLive = 24 * 3600 * 1000, countdownFromCreation = true, cacheType = FIFOCache.class)
     public Transaction getTransactionById(String id);
 
-    @Cached(cacheName = "getTransactionsByIds", capacity = 10000, allowSeparateHandlingForKeyCollections = true)
+    @Cached(cacheName = "getTransactionsByIds", targetObjectKeys={"id"}, addMode = AddMode.ADD_VALUES_TO_COLLECTION,
+    capacity = 10000, allowSeparateHandlingForKeyCollections = true)
     List<Transaction> getTransactionByIds(Set<UUID> transactionIds);
 
-    @Cached(cacheName = "getPendingTransactions")
+    @Cached(cacheName = "getPendingTransactions", addMode = RemoveMode.ADD_VALUES_TO_COLLECTION, addOnCondition="!isCompleted"
+    removeMode = RemoveMode.REMOVE_VALUE_FROM_COLLECTION, removeOnCondition="isCompleted")
     public List<Transaction> getPendingTransactions();
 
-    @Cached(cacheName = "completedTransactionCache", capacity = 1000)
-    public List<Transaction> getTransactionsByUser(String userId, boolean completed);
- 
-    @UpdatesCache(name="getTransactionById", targetObjectKeys={"id"}, addMode = AddMode.DEFAULT)
-    @UpdatesCache(name="getTransactionByIds", targetObjectKeys={"id"}, addMode = AddMode.ADD_VALUES_TO_COLLECTION)
-    @UpdatesCache(name="completedTransactionCache", targetObjectKeys={"userId", "isCompleted"}, addMode = AddMode.ADD_VALUES_TO_COLLECTION, addOnCondition="isCompleted", 
-    removeMode = RemoveMode.REMOVE_VALUE_FROM_COLLECTION, removeOnCondition="!isCompleted")
-    @UpdatesCache(name="getPendingTransactions", removeMode = RemoveMode.REMOVE_VALUE_FROM_COLLECTION, removeOnCondition="!transaction.isCompleted")
-    @UpdatesCache(name="getPendingTransactionsByUser", removeMode = RemoveMode.REMOVE_VALUE_FROM_COLLECTION, addMode = AddMode.ADD_VALUES_TO_COLLECTION, 
-    removeOnCondition="!transaction.isCompleted", addOnCondition="transaction.isCompleted", targetObjectKeys="userId")
+    @Cached(cacheName = "completedTransactionByUserCache", capacity = 1000, removeMode = RemoveMode.REMOVE_VALUE_FROM_COLLECTION, 
+    addMode = AddMode.ADD_VALUES_TO_COLLECTION, removeOnCondition="!isCompleted", addOnCondition="isCompleted", targetObjectKeys="userId")
+    public List<Transaction> getCompletedTransactionsByUser(String userId, boolean completed);
+
+    @UpdatesValuePool(addIfAbsent = true)
     public void saveTransaction(@UpdatedValue Transaction transaction);
 
     @UpdatesValuePool(remove = true)
     public void deleteTransaction(Transaction transaction);
+
+    @UpdatesCache(name="completedTransactionByUserCache", targetObjectKeys={"id"}, addMode = AddMode.DEFAULT)
+    public void markTransactionAsCompleted(@Key String userId, @Key UUID transactionId);
 
 
 Unless otherwise indicated by the presence of a @com.gmalandrakis.mnemosyne.annotations.Key annotation, all arguments are assembled to a 
@@ -162,7 +166,7 @@ CompoundKey used to retrieve the actual cache values.
 
 ### Implementing custom caching algorithms
 
-As of 8/2025 a generic implementation of a FIFO and an LRU are provided by mnemosyne. An S3-FIFO and an LFU are under construction.
+As of 9/2025 a generic implementation of a FIFO and an LRU are provided by mnemosyne. An S3-FIFO and an LFU are under construction.
 But since many projects have domain-specific needs and eviction policies, users are able to implement their own caching algorithms
 by extending the AbstractMnemosyneCache class and implementing its' abstract methods.
 
@@ -172,7 +176,7 @@ Any cache algorithm following this specification should be able to work with mne
 ### Precautions
 
 #### Proxy objects
-As of 8/2025, mnemosyne's default caching algorithms may not work properly with proxy objects.
+As of 9/2025, mnemosyne's default caching algorithms may not work properly with proxy objects.
 
 Many frameworks and libraries for databases or REST- and SOAP-based services, wrap the returned values in proxy objects
 that often lack a particular ID. There is a TODO on enabling support for enabling custom ID deduction, but
@@ -182,7 +186,7 @@ Deactivating proxy objects differs from framework to framework, (e.g. in Hiberna
 Please check the documentation of the framework/library you use.
 
 #### Collections as keys
-As of 8/2025, methods that take a Collection as an argument will work properly only if they are an abstract Collection, Set, or List.
+As of 9/2025, methods that take a Collection as an argument will work properly only if they are an abstract Collection, Set, or List.
 Using a concrete subclass, like e.g. ArrayList or HashSet, is explicitly forbidden in case you want to use special collection handling and will result to a RuntimeException.
 
 When no special collection handling is enabled, though the use of e.g. ArrayLists is not forbidden, it may result to update discrepancies if another method updates the cached one via an @UpdatesCache annotation: the objects being updates via an @UpdatesCache annotation
@@ -195,7 +199,7 @@ To understand why, consider the following use case: a method returning all the t
 (a seller is most likely associated with more than one transaction). Calling the method with the list with the values "seller1" and "seller2" 
 returns a different result than calling it with a "seller1", "seller3". If you cache this method, nothing particularly bad will happen: 
 mnemosyne will just fetch the data for "seller1" twice. 
-But if you proceed to updating the method via an @UpdatesCache annotation, as of 8/2025, you will get cache discrepancies.
+But if you proceed to updating the method via an @UpdatesCache annotation, as of 9/2025, you will get cache discrepancies.
 It would be more prudent to cache an underlying method that takes each sellerId one by one and yields a result, especially if you want to update the cache.
 
     public List<Transaction> getTransactionsBySellersDoneRight(List<String> sellers){
@@ -238,5 +242,5 @@ You may find some in the issues too.
 * Add support for records
 
 ## Further documentation
-As of 8 /2025, the documentation is provided in the code itself as javadoc.
+As of 9/2025, the documentation is provided in the code itself as javadoc.
 Running mvn javadoc:javadoc should suffice to generate a webpage with a general description.
