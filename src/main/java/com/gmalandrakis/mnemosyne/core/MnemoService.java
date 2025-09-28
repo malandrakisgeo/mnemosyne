@@ -170,7 +170,7 @@ public class MnemoService {
         if (addMode == AddMode.NONE && removeMode == RemoveMode.NONE) { //if none are set, use the underlying cache's
             //Note how we don't do the same if only one of them is set to NONE: we use the implicit conditions in that case
             removeMode = cachedMethod.getAnnotation(Cached.class).removeMode();
-            addMode =  cachedMethod.getAnnotation(Cached.class).addMode();
+            addMode = cachedMethod.getAnnotation(Cached.class).addMode();
         }
         String[] targetObjectKeyNamesAndValues = updateCache.targetObjectKeys();
 
@@ -184,22 +184,12 @@ public class MnemoService {
         var implicitRemoval = updateCache.complementaryCondition() && !explicitAddOnCondition;
         var implicitAdd = updateCache.complementaryCondition() && !explicitRemovalOnCondition;
 
-
-        if (removeMode == RemoveMode.NONE) {
-            if (implicitRemoval) {
-                removeMode = RemoveMode.values()[updateCache.addMode().ordinal()];
-            } else {
-                removeMode = cachedMethod.getAnnotation(Cached.class).removeMode(); //TODO: What about the implicit removal in the cache? Is this even actually needed?
-            }
+        if (removeMode == RemoveMode.NONE && implicitRemoval) {
+            removeMode = RemoveMode.values()[updateCache.addMode().ordinal()];
         }
 
-
-        if (addMode == AddMode.NONE) {
-            if (implicitAdd) {
-                addMode = AddMode.values()[updateCache.removeMode().ordinal()];
-            } else {
-                addMode = cachedMethod.getAnnotation(Cached.class).addMode();
-            }
+        if (addMode == AddMode.NONE && implicitAdd) {
+            addMode = AddMode.values()[updateCache.removeMode().ordinal()];
         }
 
         var key = getCompoundKeyForUpdate(annotatedKeyNamesAndValues, targetKeyNamesAndValues, updateCache.keyOrder(), cachedMethod, cacheToBeUpdated.isSpecialCollectionHandlingEnabled());

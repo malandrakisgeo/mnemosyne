@@ -166,6 +166,21 @@ public class GeneralUtils {
         return paramList;
     }
 
+    public static Class<?>[] getAnnotatedParamTypes(Method method, Class annotationType) {
+        Class<?>[] paramList = {};
+        var paramArray = new ArrayList<Class<?>>();
+        var parameters = method.getParameters();
+        for (Parameter parameter : parameters) {
+            var annotation = parameter.getAnnotation(annotationType);
+            if (annotation != null) {
+                paramArray.add(parameter.getType());
+            }
+        }
+
+        return paramArray.toArray(paramList);
+    }
+
+
     static Object tryGetIDField(Object targetObject) { //This is a final resort in case there are no fields annotated as @Id. TODO: improve
         try {
             return getFieldOrThrow(targetObject, "Id");

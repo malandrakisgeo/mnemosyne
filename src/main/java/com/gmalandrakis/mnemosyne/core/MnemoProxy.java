@@ -1,6 +1,7 @@
 package com.gmalandrakis.mnemosyne.core;
 
 import com.gmalandrakis.mnemosyne.annotations.Cached;
+import com.gmalandrakis.mnemosyne.annotations.Key;
 import com.gmalandrakis.mnemosyne.cache.AbstractGenericCache;
 import com.gmalandrakis.mnemosyne.cache.AbstractMnemosyneCache;
 import com.gmalandrakis.mnemosyne.structures.AddMode;
@@ -54,7 +55,7 @@ public class MnemoProxy<K, ID, V> {
         this.specialCollectionHandlingEnabled = specialCollectionHandling;
     }
 
-    Cached getAnnotation(){
+    Cached getAnnotation() {
         return cachedMethod.getAnnotation(Cached.class);
     }
 
@@ -189,7 +190,12 @@ public class MnemoProxy<K, ID, V> {
            Which means that we may end up returning one value instead of e.g. fortythree if we update a non-special-handling cache without having called the underlying
            function at least once with the same key.
          */
+
+        if (!validArgs(cachedMethod, (CompoundKey) compoundKey)) { //If the compoundKey does not correspond to the underlying arguments, there is nothing to add preemptively
+            return;
+        }
         var returned = cache.getAll((K) compoundKey);
+
         if (returned == null || returned.isEmpty()) {
             var args = deduceArgsFromCompoundKey(cachedMethod, (CompoundKey) compoundKey);
             if (args == null) {
@@ -199,6 +205,25 @@ public class MnemoProxy<K, ID, V> {
             }
         }
     }
+
+    //TODO: Improve, and unit-test. May not work properly with variable args without annotation
+    private boolean validArgs(Method method, CompoundKey compoundKey) {
+        var kObjects = compoundKey.getKeyObjects();
+        if (kObjects.length != method.getParameterCount()) {
+            return false;
+        }
+
+        var acceptable = true;
+        var types = GeneralUtils.getAnnotatedParamTypes(method, Key.class);
+        if (types.length == 0) {
+            types = method.getParameterTypes();
+        }
+        for (int i = 0; i < kObjects.length; i++) {
+            acceptable &= kObjects[i].getClass().getName().equals(types[i].getName());
+        }
+        return acceptable;
+    }
+
 
     private Object[] deduceArgsFromCompoundKey(Method method, CompoundKey compoundKey) {
         if (method.getParameters().length == 1) {
@@ -266,12 +291,12 @@ public class MnemoProxy<K, ID, V> {
     private Map<ID, V> getMultipleSpecialAndUpdate(CompoundKey compoundKey, Object... args) {
         assert (specialCollectionHandlingEnabled && compoundKey.getKeyObjects().length == 1
                 && compoundKey.getKeyObjects()[0] instanceof Collection && args.length == 1); //A very specific but very common subcase: calling a repository or rest-api method with a single Collection of IDs as argument
-       // var returnTypeIsList = List.class.isAssignableFrom(cachedMethod.getReturnType());
+        // var returnTypeIsList = List.class.isAssignableFrom(cachedMethod.getReturnType());
         var keyTypeIsList = compoundKey.getKeyObjects()[0] instanceof List; // //Reminder that the Collection here may be only Set or List.
         var keys = (Collection<K>) compoundKey.getKeyObjects()[0]; //In this case, the compoundKey is not the key itself: it contains a Collection of the actual keys instead, created from the arguments given.
 
         List<K> failedKeys = Collections.synchronizedList(new ArrayList<K>()); //a list with the keys that did not return a value, i.e. returned empty collection or null.
-      //  var keyValueMap = new ConcurrentHashMap<K, V>();
+        //  var keyValueMap = new ConcurrentHashMap<K, V>();
         Map<ID, V> initiallyMissedFromCache = new ConcurrentHashMap<>();
         keys.stream()
                 .parallel()
@@ -280,8 +305,8 @@ public class MnemoProxy<K, ID, V> {
                     if (hit == null) {
                         failedKeys.add(k);
                     } else {
-                  //      keyValueMap.put(k, hit); //As noted in the documentation, a 1-1 correlation is assumed: one key corresponds to at most one value.
-                        initiallyMissedFromCache.put((ID) GeneralUtils.deduceIdOrMap(hit),hit);
+                        //      keyValueMap.put(k, hit); //As noted in the documentation, a 1-1 correlation is assumed: one key corresponds to at most one value.
+                        initiallyMissedFromCache.put((ID) GeneralUtils.deduceIdOrMap(hit), hit);
                     }
                 });
 
@@ -292,7 +317,7 @@ public class MnemoProxy<K, ID, V> {
                                 var callWith = keyTypeIsList ? Collections.singletonList(failedKey) : Collections.singleton(failedKey);  //invoke with singleton List or Set.
                                 var value = invokeUnderlyingMethod(callWith);
                                 if (value == null) {
-                                  //  keyValueMap.put(failedKey, null);
+                                    //  keyValueMap.put(failedKey, null);
                                 } else {
                                     assert (value instanceof Collection); //TODO: Add this to generalControls and delete here.
                                     var valueCollection = (Collection<V>) value;
@@ -305,7 +330,7 @@ public class MnemoProxy<K, ID, V> {
                                         initiallyMissedFromCache.put(id, val);
                                         valuePool.updateValueOrPutPreemptively(id, val);
                                         cache.put((K) GeneralUtils.deduceCompoundKeyFromMethodAndArgs(cachedMethod, new Object[]{failedKey}), id);
-                                      //  keyValueMap.put(failedKey, Iterables.get(valueCollection, 0));
+                                        //  keyValueMap.put(failedKey, Iterables.get(valueCollection, 0));
                                     }
                                 }
                             }
