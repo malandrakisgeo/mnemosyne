@@ -2,7 +2,7 @@ package com.gmalandrakis.mnemosyne.cache;
 
 import com.gmalandrakis.mnemosyne.core.ValuePool;
 import com.gmalandrakis.mnemosyne.structures.*;
-import com.gmalandrakis.mnemosyne.utils.GeneralUtils;
+import com.gmalandrakis.mnemosyne.core.MnemoCommon;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -72,7 +72,7 @@ public class FIFOTest {
     public void verify__removalFromValuePool() throws InterruptedException {
         for (int i = 0; i < 10; i++) {
             var integersToI = this.getIntegersTo(i);
-            var idmap = (Map) GeneralUtils.deduceIdOrMap(integersToI);
+            var idmap = (Map) MnemoCommon.deduceIdOrMap(integersToI);
             var integer = this.getInteger(i);
 
             valuePool.updateValueOrPutPreemptively(i, integer);
@@ -107,8 +107,8 @@ public class FIFOTest {
         for (int i = 0; i < 10; i++) {
             var objects = this.getTestObjects(i); //returns an empty list on zero!
             var object = this.gettestObject(i);
-            var ids = (Map) GeneralUtils.deduceIdOrMap(objects);
-            var id = GeneralUtils.deduceIdOrMap(object);
+            var ids = (Map) MnemoCommon.deduceIdOrMap(objects);
+            var id = MnemoCommon.deduceIdOrMap(object);
             intlst.add(i);
             testObjectValuePool.updateValueOrPutPreemptively(id, object);
 
@@ -117,7 +117,7 @@ public class FIFOTest {
         }
         assert (testObjectValuePool.getSize() == 10);
 
-        var id = GeneralUtils.deduceIdOrMap( this.gettestObject(0));
+        var id = MnemoCommon.deduceIdOrMap( this.gettestObject(0));
         assert (testObjectValuePool.getNumberOfUsesForId(id) == 2);
         assert (collectionTestObjectCache.numberOfUsesById.get(id) == 9);
         assert (singleTestObjectCache.numberOfUsesById.get(id) == 1);
@@ -154,8 +154,8 @@ public class FIFOTest {
         var testobj = this.gettestObject(1);
         var testobj2 = this.gettestObject(2);
 
-        var id = GeneralUtils.deduceIdOrMap(testobj);
-        var id2 = GeneralUtils.deduceIdOrMap(testobj2);
+        var id = MnemoCommon.deduceIdOrMap(testobj);
+        var id2 = MnemoCommon.deduceIdOrMap(testobj2);
         testObjectValuePool.updateValueOrPutPreemptively(id, testobj);
         singleTestObjectCache.put(1, id);
         assert (singleTestObjectCache.numberOfUsesById.get(id) == 1);
@@ -192,12 +192,12 @@ public class FIFOTest {
 
         for(int i = 0; i < 100; i++){
             var object = this.gettestObject(i);
-            var id = (String) GeneralUtils.deduceIdOrMap(object);
+            var id = (String) MnemoCommon.deduceIdOrMap(object);
             collectionTestObjectCache.putAll(i, Set.of(id));
         }
        // assert (testObjectValuePool.getSize() == 100); //once upon a time the caches were putting new objects to the value pools!
         var object = this.gettestObject(101);
-        var id = (String) GeneralUtils.deduceIdOrMap(object);
+        var id = (String) MnemoCommon.deduceIdOrMap(object);
         collectionTestObjectCache.putAll(100, Set.of(id));
         assert (collectionTestObjectCache.numberOfUsesById.size() == 100);
         assert (collectionTestObjectCache.getAll(0).isEmpty());
@@ -213,7 +213,7 @@ public class FIFOTest {
         var valueMap = (ConcurrentHashMap<?, CacheValue<?>>) valMapField.get(collectionIntegerCache.valuePool);
         for (int i = 0; i < 1000; i++) {
             var integersToI = this.getIntegersTo(i);
-            Map<Integer,Integer> id = (Map<Integer,Integer>) GeneralUtils.deduceIdOrMap(integersToI);
+            Map<Integer,Integer> id = (Map<Integer,Integer>) MnemoCommon.deduceIdOrMap(integersToI);
             id.forEach(collectionIntegerCache.valuePool::updateValueOrPutPreemptively);
             collectionIntegerCache.putAll(i, id.keySet());
         }
@@ -225,7 +225,7 @@ public class FIFOTest {
 
         for (int i = 0; i < 10000; i++) {
             var integerToI = this.getInteger(i);
-            var id = GeneralUtils.deduceIdOrMap(integerToI);
+            var id = MnemoCommon.deduceIdOrMap(integerToI);
             singleIntegerCache.valuePool.updateValueOrPutPreemptively((Integer) id, integerToI);
 
             singleIntegerCache.put(i, (Integer) id);
@@ -249,7 +249,7 @@ public class FIFOTest {
          */
         for (int i = 0; i < 1000; i++) {
             var integersToI = this.getIntegersTo(i);
-            Map<String, String> id = (Map<String, String>) GeneralUtils.deduceIdOrMap(integersToI.stream().map(String::valueOf).toList());
+            Map<String, String> id = (Map<String, String>) MnemoCommon.deduceIdOrMap(integersToI.stream().map(String::valueOf).toList());
             id.forEach((a,b)->separateHandlingCache.valuePool.updateValueOrPutPreemptively(a,(Integer.valueOf(b))));
 
             separateHandlingCache.putAll(i, id.keySet());
