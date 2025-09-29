@@ -9,7 +9,6 @@ import com.gmalandrakis.mnemosyne.structures.CompoundId;
 import com.gmalandrakis.mnemosyne.structures.CompoundKey;
 
 import java.lang.annotation.Annotation;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.lang.reflect.Type;
@@ -17,14 +16,21 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
-/*
-    The reason this is not a part of the /utils package, is that we usually place under /utils functions
-    that could be used more or less anywhere, i.e. functions that are not directly related to the logic
-    of the project, and for mostly trivial tasks. The functions of this class
-    *are* directly related to the logic of mnemosyne (actually so intermingled with it that they would be useless anywhere else),
-    and some of them are not very trivial.
+import static com.gmalandrakis.mnemosyne.utils.GeneralUtils.tryGetField;
+
+/**
+ * Static mnemosyne-specific functions used by both MnemoProxy and MnemoService.
+ *
+ * @author George Malandrakis (malandrakisgeo@gmail.com)
  */
 public class MnemoCommon {
+    /*
+        The reason this is not a part of the /utils package, is that we usually place under /utils functions
+        that could be used more or less anywhere, i.e. functions that are not directly related to the logic
+        of the project, and for mostly trivial tasks. The functions of this class
+        *are* directly related to the logic of mnemosyne (actually so intermingled with it that they would be useless anywhere else),
+        and some of them are not very trivial.
+     */
 
     //Returns just the ID of an object for single-value caches, or the id-value map for collection caches. TODO: Break in two separate functions for these purposes
     public static Object deduceIdOrMap(Object object) {
@@ -193,33 +199,6 @@ public class MnemoCommon {
         return fieldValue;
     }
 
-    public static Object tryGetField(Object targetObject, String keyName) {
-        if (targetObject == null || keyName == null || keyName.isEmpty()) {
-            return null;
-        }
-
-        var targetClass = targetObject.getClass();
-        var capitalizedKeyName = keyName.substring(0, 1).toUpperCase() + keyName.substring(1);
-
-        try {
-            var field = targetClass.getDeclaredField(keyName);
-            field.setAccessible(true);
-            return field.get(targetObject);
-        } catch (NoSuchFieldException | IllegalAccessException e) {
-            String[] prefixes = {"", "get", "is", "fetch", "has"};
-            for (String prefix : prefixes) {
-                try {
-                    var method = targetClass.getMethod(prefix + capitalizedKeyName);
-                    return method.invoke(targetObject);
-                } catch (NoSuchMethodException | IllegalAccessException ignore) {
-                } catch (InvocationTargetException ex) {
-                    throw new RuntimeException("Failed to access method " + prefix + capitalizedKeyName, ex);
-                }
-            }
-        }
-        return null;
-    }
-
     static LinkedHashMap<String, Object> linkTargetObjectKeysToObjects(List<String> targetObjectKeys, Object targetObject) {
         var map = new LinkedHashMap<String, Object>(); //keeps the order intact
         if (targetObject != null) {
@@ -325,7 +304,7 @@ public class MnemoCommon {
             }
 
             if (updatedObject != null) {
-                var updated = MnemoCommon.tryGetField(updatedObject, fieldName);
+                var updated = tryGetField(updatedObject, fieldName);
                 if (updated != null && Boolean.class.isAssignableFrom(updated.getClass())) {
                     booleans.add(negated != (Boolean) updated);
                 }

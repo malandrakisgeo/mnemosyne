@@ -21,8 +21,8 @@ import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 import static com.gmalandrakis.mnemosyne.core.MnemoCommon.*;
-import static com.gmalandrakis.mnemosyne.utils.GenericUtils.allNull;
-import static com.gmalandrakis.mnemosyne.utils.GenericUtils.isAssignableTo;
+import static com.gmalandrakis.mnemosyne.utils.GeneralUtils.allNull;
+import static com.gmalandrakis.mnemosyne.utils.GeneralUtils.isAssignableTo;
 
 /**
  * A proxy service standing between method invocations and cache implementations.

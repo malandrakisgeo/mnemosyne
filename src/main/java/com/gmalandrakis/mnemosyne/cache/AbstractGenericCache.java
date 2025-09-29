@@ -3,14 +3,13 @@ package com.gmalandrakis.mnemosyne.cache;
 import com.gmalandrakis.mnemosyne.structures.CacheParameters;
 import com.gmalandrakis.mnemosyne.structures.IdWrapper;
 import com.gmalandrakis.mnemosyne.core.ValuePool;
-import com.gmalandrakis.mnemosyne.core.MnemoCommon;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import static com.gmalandrakis.mnemosyne.utils.GenericUtils.sleepUninterrupted;
+import static com.gmalandrakis.mnemosyne.utils.GeneralUtils.sleepUninterrupted;
 
 public abstract class AbstractGenericCache<K, ID, V> extends AbstractMnemosyneCache<K, ID, V> {
     final ExecutorService internalThreadService;
