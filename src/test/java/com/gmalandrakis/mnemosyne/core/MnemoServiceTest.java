@@ -4,7 +4,9 @@ import com.gmalandrakis.mnemosyne.annotations.*;
 import com.gmalandrakis.mnemosyne.cache.AbstractGenericCache;
 import com.gmalandrakis.mnemosyne.exception.MnemosyneInitializationException;
 import com.gmalandrakis.mnemosyne.exception.MnemosyneRuntimeException;
+import com.gmalandrakis.mnemosyne.structures.AddMode;
 import com.gmalandrakis.mnemosyne.structures.CollectionIdWrapper;
+import com.gmalandrakis.mnemosyne.structures.RemoveMode;
 import org.junit.Test;
 import org.mockito.Mockito;
 
@@ -217,35 +219,35 @@ public class MnemoServiceTest {
     class innerClass {
 
 
-        @Cached(cacheName = "cache4")
+        @Cached(cacheName = "cache4", addMode = AddMode.SINGLE_VALUE, removeMode = RemoveMode.SINGLE_VALUE)
         public Object test4() {
             return null;
         }
 
-        @Cached(cacheName = "should throw a Runtime - separate handling with concrete implementation of List", allowSeparateHandlingForKeyCollections = true)
+        @Cached(cacheName = "should throw a Runtime - separate handling with concrete implementation of List", allowSeparateHandlingForKeyCollections = true,  addMode = AddMode.ADD_TO_COLLECTION, removeMode = RemoveMode.REMOVE_FROM_COLLECTION)
         ArrayList<Object> test6(Collection<String> col) {
             return null;
         }
 
-        @Cached(cacheName = "cache4")
+        @Cached(cacheName = "cache4" , addMode = AddMode.SINGLE_VALUE, removeMode = RemoveMode.SINGLE_VALUE)
             //same name as test4 = runtime
         Set<Object> test7() {
             return null;
         }
 
-        @Cached(cacheName = "separateHandling", allowSeparateHandlingForKeyCollections = true)
+        @Cached(cacheName = "separateHandling", allowSeparateHandlingForKeyCollections = true,  addMode = AddMode.ADD_TO_COLLECTION, removeMode = RemoveMode.REMOVE_FROM_COLLECTION)
         Collection<Object> test8(Collection<String> col) {
             return null;
         }
 
 
-        @Cached(cacheName = "test9", countdownFromCreation = true)
+        @Cached(cacheName = "test9", countdownFromCreation = true, addMode = AddMode.NONE, removeMode = RemoveMode.NONE)
         public String test9(Integer i) { //updated by updateTest9
             return null;
         }
 
-        @UpdatesCache(name = "test9", annotatedKeys = "testKey", removeMode = UpdatesCache.RemoveMode.REMOVE_VALUE_FROM_COLLECTION, addMode = UpdatesCache.AddMode.NONE)
-        @Cached(cacheName = "testUpdate")
+        @UpdatesCache(name = "test9", annotatedKeys = "testKey", removeMode = RemoveMode.REMOVE_FROM_COLLECTION, addMode = AddMode.NONE)
+        @Cached(cacheName = "testUpdate", addMode = AddMode.SINGLE_VALUE, removeMode = RemoveMode.SINGLE_VALUE)
         public String updateTest9(@UpdateKey(keyId = "testKey") Integer i) {
             if (i == 1) {
                 return "Yey!";
@@ -254,7 +256,7 @@ public class MnemoServiceTest {
         }
 
 
-        @Cached(cacheName = "test10", countdownFromCreation = true)
+        @Cached(cacheName = "test10", countdownFromCreation = true, addMode = AddMode.ADD_TO_COLLECTION, removeMode = RemoveMode.REMOVE_FROM_COLLECTION)
         public List<String> test10(Integer i) {
 
             if (i % 2 == 0) {
@@ -263,30 +265,33 @@ public class MnemoServiceTest {
             return Collections.singletonList("Yoy");
         }
 
-        @Cached(cacheName = "testPreemptiveUpdate", countdownFromCreation = true)
+        @Cached(cacheName = "testPreemptiveUpdate", countdownFromCreation = true,  addMode = AddMode.ADD_TO_COLLECTION, removeMode = RemoveMode.REMOVE_FROM_COLLECTION)
         public List<String> functionForPreemptiveUpdateTest(Integer i) {
             return List.of("val1", "val2", String.valueOf(i));
         }
 
-        @UpdatesCache(name = "testPreemptiveUpdate", annotatedKeys = "testKey", addMode = UpdatesCache.AddMode.DEFAULT, removeMode = UpdatesCache.RemoveMode.NONE)
+        @UpdatesCache(name = "testPreemptiveUpdate", annotatedKeys = "testKey", addMode = AddMode.SINGLE_VALUE, removeMode = RemoveMode.NONE)
         public void testpreemptiveUpdateWithList(@UpdatedValue List<String> str, @UpdateKey(keyId = "testKey") Integer i) {
         }
 
-        @UpdatesCache(name = "testPreemptiveUpdate", annotatedKeys = "testKey", addMode = UpdatesCache.AddMode.ADD_VALUES_TO_COLLECTION, removeMode = UpdatesCache.RemoveMode.NONE)
+        @UpdatesCache(name = "testPreemptiveUpdate", annotatedKeys = "testKey", addMode = AddMode.ADD_TO_COLLECTION, removeMode = RemoveMode.NONE)
         public void testpreemptiveUpdate(@UpdatedValue String str, @UpdateKey(keyId = "testKey") Integer i) {
         }
 
-        @Cached(cacheName = "separateHandlingToBeTested", capacity = 500, allowSeparateHandlingForKeyCollections = true, threadPoolSize = 5)
+        @Cached(cacheName = "separateHandlingToBeTested",
+                addMode = AddMode.ADD_TO_COLLECTION, removeMode = RemoveMode.REMOVE_FROM_COLLECTION ,
+                capacity = 500, allowSeparateHandlingForKeyCollections = true, threadPoolSize = 5)
        public List<Integer> test11(List<Integer> integers) { //stupid function
             return integers;
         }
 
-        @Cached(cacheName = "separateHandlingWithKeyToBeTested", capacity = 500, allowSeparateHandlingForKeyCollections = true, threadPoolSize = 5)
+        @Cached(cacheName = "separateHandlingWithKeyToBeTested",addMode = AddMode.ADD_TO_COLLECTION, removeMode = RemoveMode.REMOVE_FROM_COLLECTION ,
+                capacity = 500, allowSeparateHandlingForKeyCollections = true, threadPoolSize = 5)
         public List<Integer> test12(@Key List<Integer> integers, int i) { //stupid function
             return integers;
         }
 
-        @Cached(cacheName = "separateHandlingWithKeyToBeTestedAndThrow", capacity = 500, allowSeparateHandlingForKeyCollections = true, threadPoolSize = 5)
+        @Cached(cacheName = "separateHandlingWithKeyToBeTestedAndThrow",addMode = AddMode.ADD_TO_COLLECTION, removeMode = RemoveMode.REMOVE_FROM_COLLECTION , capacity = 500, allowSeparateHandlingForKeyCollections = true, threadPoolSize = 5)
         public  List<Integer> test13(List<Integer> integers, int i) { //shouldThrow
             return integers;
         }

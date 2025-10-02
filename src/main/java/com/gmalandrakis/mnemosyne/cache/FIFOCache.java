@@ -102,7 +102,8 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
         if (!returnsCollection || handleCollectionKeysSeparately) {
             return;
         }
-        var initialNumOfUses = numberOfUsesById.get(id);
+        var in = numberOfUsesById.get(id);
+        var initialNumOfUses = in == null ? 0 : in;
         int i = initialNumOfUses;
         for (K k : keyIdMapper.keySet()) {
             var idWrapper = ((CollectionIdWrapper) keyIdMapper.get(k));
@@ -202,7 +203,7 @@ public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
         for (ID id : ids) {
             if (!returnsCollection) {
                 for (K k : keyIdMapper.keySet()) {
-                    if (((SingleIdWrapper) k).getId().equals(id)) {
+                    if (((SingleIdWrapper) keyIdMapper.get(k)).getId().equals(id)) {
                         relatedKeys.add(k);
                         removeOrDecreaseIdUses(id);
                     }

@@ -4,6 +4,8 @@ import com.gmalandrakis.mnemosyne.cache.AbstractGenericCache;
 import com.gmalandrakis.mnemosyne.cache.AbstractMnemosyneCache;
 import com.gmalandrakis.mnemosyne.cache.FIFOCache;
 import com.gmalandrakis.mnemosyne.core.MnemoProxy;
+import com.gmalandrakis.mnemosyne.structures.AddMode;
+import com.gmalandrakis.mnemosyne.structures.RemoveMode;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
@@ -141,6 +143,81 @@ public @interface Cached {
      */
     boolean allowSeparateHandlingForKeyCollections() default false;
 
+    /**
+     * The names of the key fields present in the target object, i.e. the object that is used for the update (either annotated as @UpdatedValue, or just what the Method returns if an @UpdatedValue is not present).
+     * <p>
+     * The fields must either be directly accessible (e.g. public), or have a getter that follows Java naming conventions.
+     * <p>
+     * As with the annotatedKeys, the field names here <b>must</b> be in the same ordering as the arguments in the target cached Method.
+     * <p>
+     * If a combination of annotatedKeys and targetObjectKeys is used, the order of the keys shall be specified in the keyOrder field.
+     * <p>
+     * Note that in the @Cached context, it is used only if an @UpdatesValuePool for the same type is present and ignored otherwise.
+     */
+
+    String[] targetObjectKeys() default "";
+
+    /**
+     * Determines how new values are added to the existing caches.
+     * Refer to {@link AddMode} for further details.
+     *
+     */
+    AddMode addMode();
+
+    /**
+     * Determines how new values are removed from the existing caches.
+     * Refer to {@link RemoveMode} for further details.
+     */
+    RemoveMode removeMode();
+
+    /**
+     * Refers to one or more boolean values that have to be true before adding something new to the cache.
+     * These values are either annotated as @UpdateKey with the given name, or are present as fields in the
+     * target object (i.e. the object annotated with @UpdatedValue or returned from the function, if an @UpdatedValue is absent).
+     * <p>
+     * By default, if multiple conditions are present, a logical AND applies (i.e. all have to be true). You may set conditionalANDGate to false if you prefer a logical OR.
+     * <p>
+     * If the keys cannot be cast to boolean, an exception is thrown.
+     * <p>
+     * If the result of the addOnCondition operation clashes with the one for the conditionalDelete, an exception is thrown.
+     * <p>
+     * Booleans we want to be negative must start with an exclamation mark ('!').
+     * <p>
+     * Example:
+     * <pre>
+     *       {@code
+     *       @UpdatesCache(name="getActiveUsers", addOnCondition={"isActive", "isVerified"}, removeOnCondition={"!isActive"})
+     *       public void saveUserDetails(@UpdatedValue User newUser)
+     *       }
+     *       </pre>
+     * Set complementaryCondition to true if you expect a removal when the condition is false and the object is present in the cache.
+     */
+    String[] addOnCondition() default "";
+
+    /**
+     * Similar to addOnCondition.
+     * Set complementaryCondition to true if you expect an addition when the condition is false and the object is present in the cache.
+     */
+    String[] removeOnCondition() default "";
+
+    /**
+     * AddOnCondition is often complementary to removeOnCondition (i.e. "add to cache if A"  often implies "evict from cache if not A"), and vice versa.
+     * Setting complementaryCondition treats the inverse of the given condition for adding as a condition for removing, and vice versa.
+     * Example:
+     * <pre>
+     *       {@code
+     *       @UpdatesCache(name="getActiveUsers", addOnCondition={"isActive", "isVerified"}, conditionalANDGate = false, complementaryCondition = true) //removes from cache if isActive and isVerified are both false
+     *       public void saveActiveUserDetails(@UpdatedValue User newUser)
+     *       }
+     *       </pre>
+     */
+    boolean complementaryCondition() default false;
+
+    /**
+     * If set to true, all conditions in the addOnCondition and removeOnCondition have to be true in order for the new element to be added/removed.
+     * Otherwise one suffices.
+     */
+    boolean conditionalANDGate() default true;
 
 
 }

@@ -2,11 +2,11 @@ package com.gmalandrakis.mnemosyne.core;
 
 import com.gmalandrakis.mnemosyne.annotations.Cached;
 import com.gmalandrakis.mnemosyne.annotations.UpdatesCache;
-import com.gmalandrakis.mnemosyne.annotations.UpdatesCache.AddMode;
-import com.gmalandrakis.mnemosyne.annotations.UpdatesCache.RemoveMode;
 
 import com.gmalandrakis.mnemosyne.annotations.UpdateKey;
 import com.gmalandrakis.mnemosyne.annotations.UpdatedValue;
+import com.gmalandrakis.mnemosyne.structures.AddMode;
+import com.gmalandrakis.mnemosyne.structures.RemoveMode;
 import org.junit.Test;
 
 import java.util.List;
@@ -93,7 +93,7 @@ public class MnemoServiceUpdateTest {
             1. Add special handling for multiple updates and single update
             2.
          */
-        @Cached(cacheName = "test9", countdownFromCreation = true)
+        @Cached(cacheName = "test9", countdownFromCreation = true, addMode = AddMode.SINGLE_VALUE, removeMode = RemoveMode.SINGLE_VALUE)
         public Customer test9(String name) { //updated by updateTest9
             var cust = new Customer();
             cust.setName(name);
@@ -102,27 +102,27 @@ public class MnemoServiceUpdateTest {
             return cust;
         } //TODO: Add controls for types
 
-        @Cached(cacheName = "getByAgeAndActivated", countdownFromCreation = true)
+        @Cached(cacheName = "getByAgeAndActivated", countdownFromCreation = true, addMode = AddMode.ADD_TO_COLLECTION, removeMode = RemoveMode.REMOVE_FROM_COLLECTION)
         public List<Customer> getByAgeAndActivated(int age, boolean bool) {
             return null;
         }
 
-        @Cached(cacheName = "getByAgeActivatedOnly", countdownFromCreation = true)
+        @Cached(cacheName = "getByAgeActivatedOnly", countdownFromCreation = true, addMode = AddMode.ADD_TO_COLLECTION, removeMode = RemoveMode.REMOVE_FROM_COLLECTION)
         public List<Customer> getByAgeActivatedOnly(int age) {
             return null;
         }
 
         //   @UpdateCache(name = "getByAgeActivatedOnly", targetObjectKeys = {"age"}, addOnCondition = "activated", conditionalDelete = "!activated")
         //   @UpdateCache(name = "getByAgeAndActivated", targetObjectKeys = {"age", "accountActivated"})
-        @UpdatesCache(name = "getByAgeAndActivated", targetObjectKeys = {"age", "accountActivated"}, addMode = AddMode.DEFAULT, removeMode = RemoveMode.NONE)
-        @UpdatesCache(name = "test9", targetObjectKeys = "id", addMode = AddMode.DEFAULT, removeMode = RemoveMode.NONE)
+        @UpdatesCache(name = "getByAgeAndActivated", targetObjectKeys = {"age", "accountActivated"}, addMode = AddMode.SINGLE_VALUE, removeMode = RemoveMode.NONE)
+        @UpdatesCache(name = "test9", targetObjectKeys = "id", addMode = AddMode.SINGLE_VALUE, removeMode = RemoveMode.NONE)
         public String updateTest9(@UpdatedValue Customer i) {
             return i.getName();
         }
 
 
-        @UpdatesCache(name = "test9", annotatedKeys = "testKey", addMode = AddMode.DEFAULT, removeMode = RemoveMode.NONE)
-        @Cached(cacheName = "testUpdate")
+        @UpdatesCache(name = "test9", annotatedKeys = "testKey", addMode = AddMode.SINGLE_VALUE, removeMode = RemoveMode.NONE)
+        @Cached(cacheName = "testUpdate", removeMode = RemoveMode.NONE,addMode = AddMode.SINGLE_VALUE )
         public String update9Test2(@UpdateKey(keyId = "testKey") Integer i) {
             if (i == 1) {
                 return "Yey!";
@@ -131,7 +131,7 @@ public class MnemoServiceUpdateTest {
         }
 
 
-        @Cached(cacheName = "test10", countdownFromCreation = true)
+        @Cached(cacheName = "test10", countdownFromCreation = true, addMode = AddMode.ADD_TO_COLLECTION, removeMode = RemoveMode.NONE)
         public List<Customer> test10(List<String> ids) {
             var cust1 = new Customer();
             cust1.setId("id1");
@@ -141,7 +141,7 @@ public class MnemoServiceUpdateTest {
 
         }
 
-        @UpdatesCache(name = "test10", targetObjectKeys = "id", addMode = AddMode.ADD_VALUES_TO_COLLECTION, removeMode = RemoveMode.NONE)
+        @UpdatesCache(name = "test10", targetObjectKeys = "id")
         public void saveCustomer(@UpdatedValue Customer newcustomer) {
         }
 

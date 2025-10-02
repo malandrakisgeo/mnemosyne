@@ -43,7 +43,8 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
         if (!returnsCollection || handleCollectionKeysSeparately) {
             return;
         }
-        var initialNumOfUses = numberOfUsesById.get(id);
+        var in = numberOfUsesById.get(id);
+        var initialNumOfUses = in == null ? 0 : in;
         int i = initialNumOfUses;
         synchronized (keyIdMapper) {
             for (K k : keyIdMapper.keySet()) {

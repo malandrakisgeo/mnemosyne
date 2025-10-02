@@ -1,13 +1,16 @@
 package com.gmalandrakis.mnemosyne.core;
 
-import com.gmalandrakis.mnemosyne.annotations.UpdatesCache.RemoveMode;
-import com.gmalandrakis.mnemosyne.annotations.UpdatesCache.AddMode;
-
+import com.gmalandrakis.mnemosyne.annotations.Cached;
+import com.gmalandrakis.mnemosyne.annotations.Key;
+import com.gmalandrakis.mnemosyne.annotations.UpdateKey;
+import com.gmalandrakis.mnemosyne.annotations.UpdatesCache;
 import com.gmalandrakis.mnemosyne.cache.AbstractGenericCache;
 import com.gmalandrakis.mnemosyne.cache.AbstractMnemosyneCache;
+import com.gmalandrakis.mnemosyne.structures.AddMode;
 import com.gmalandrakis.mnemosyne.structures.CompoundKey;
-import com.gmalandrakis.mnemosyne.utils.GeneralUtils;
+import com.gmalandrakis.mnemosyne.structures.RemoveMode;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.*;
@@ -17,8 +20,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
+import static com.gmalandrakis.mnemosyne.core.MnemoCommon.*;
 import static com.gmalandrakis.mnemosyne.utils.GeneralUtils.allNull;
-import static com.gmalandrakis.mnemosyne.utils.GeneralUtils.getAnnotatedUpdatedValue;
+import static com.gmalandrakis.mnemosyne.utils.GeneralUtils.isAssignableTo;
 
 /**
  * A proxy service standing between method invocations and cache implementations.
@@ -54,9 +58,13 @@ public class MnemoProxy<K, ID, V> {
         this.specialCollectionHandlingEnabled = specialCollectionHandling;
     }
 
+    Cached getAnnotation() {
+        return cachedMethod.getAnnotation(Cached.class);
+    }
+
 
     Object getFromCache(Object... args) {
-        var compoundKey = GeneralUtils.deduceCompoundKeyFromMethodAndArgs(cachedMethod, args);
+        var compoundKey = MnemoCommon.deduceCompoundKeyFromMethodAndArgs(cachedMethod, args);
         if (returnsCollections) {
             if (specialCollectionHandlingEnabled) {
                 return fetchFromSeparateHandlingCache(compoundKey);
@@ -72,7 +80,7 @@ public class MnemoProxy<K, ID, V> {
     }
 
     Map<ID, V> getFromUnderlyingMethodAndUpdateMainCache(Object... args) {
-        var compoundKey = GeneralUtils.deduceCompoundKeyFromMethodAndArgs(cachedMethod, args);
+        var compoundKey = MnemoCommon.deduceCompoundKeyFromMethodAndArgs(cachedMethod, args);
 
         if (!returnsCollections) {
             return getSingleAndUpdate(compoundKey, args);
@@ -85,10 +93,10 @@ public class MnemoProxy<K, ID, V> {
         }
     }
 
-    public Object deduce(Map<ID, V> res) {
+    Object deduce(Map<ID, V> res) {
         if (res != null && res.size() != 0) {
             if (!returnsCollections) {
-                return res.get(List.of(res.keySet()).get(0));
+                return res.values().stream().toList().get(0);
             } else {
                 if (List.class.isAssignableFrom(cachedMethod.getReturnType())) {
                     return res.values().stream().collect(Collectors.toList());
@@ -108,15 +116,15 @@ public class MnemoProxy<K, ID, V> {
     void updateByRemoving(K key, Map<ID, V> idValueMap, Boolean conditionalRemove, RemoveMode removeMode) {
         if (removeMode != RemoveMode.NONE && (conditionalRemove == null || conditionalRemove)) {
 
-            if (key != null && removeMode.equals(RemoveMode.DEFAULT) || idValueMap == null) {
+            if (key != null && removeMode.equals(RemoveMode.SINGLE_VALUE) || idValueMap == null) {
                 cache.remove(key);
                 return;
             }
 
             if (returnsCollections) {
-                if (removeMode.equals(RemoveMode.REMOVE_VALUE_FROM_COLLECTION)) {
+                if (removeMode.equals(RemoveMode.REMOVE_FROM_COLLECTION)) {
                     idValueMap.keySet().forEach(id -> cache.removeOneFromCollection(key, id));
-                } else if (removeMode.equals(RemoveMode.REMOVE_VALUE_FROM_ALL_COLLECTIONS)) {
+                } else if (removeMode.equals(RemoveMode.REMOVE_FROM_ALL_COLLECTIONS)) {
                     cache.removeById(idValueMap.keySet());//o prwtos pou tha mou steilei email gia auto to sxolio lamvanei pente evrw.
                 }
             }
@@ -131,8 +139,8 @@ public class MnemoProxy<K, ID, V> {
     void updateByAdding(K key, Map<ID, V> idValueMap, Boolean conditionalAdd, AddMode addMode) {
         if (addMode != AddMode.NONE && (conditionalAdd == null || conditionalAdd)) {
 
-            if (addMode == AddMode.DEFAULT) {
-                cache.remove(key);
+            if (addMode == AddMode.SINGLE_VALUE) {
+                //cache.remove(key);
                 if (returnsCollections) {
                     if (!specialCollectionHandlingEnabled) {
                         preemptiveAdd(key, idValueMap.keySet()); //Crudely written. TODO: Improve or remove. Perhaps allow the user to decide if the preemptive add happens?
@@ -144,7 +152,7 @@ public class MnemoProxy<K, ID, V> {
                 }
             }
 
-            if (addMode == AddMode.ADD_VALUES_TO_COLLECTION) {
+            if (addMode == AddMode.ADD_TO_COLLECTION) {
                 if (returnsCollections) {
                     if (!specialCollectionHandlingEnabled) {
                         preemptiveAdd(key, idValueMap.keySet());
@@ -153,7 +161,7 @@ public class MnemoProxy<K, ID, V> {
                 cache.putAll(key, idValueMap.keySet());
             }
 
-            if (addMode == AddMode.ADD_VALUES_TO_ALL_COLLECTIONS) {
+            if (addMode == AddMode.ADD_TO_ALL_COLLECTIONS) {
                 idValueMap.keySet().forEach(cache::putInAllCollections);
             }
 
@@ -177,6 +185,115 @@ public class MnemoProxy<K, ID, V> {
         return specialCollectionHandlingEnabled;
     }
 
+    //TODO: Simplify the flow here
+    void updateCacheViaAnnotation(UpdatesCache updateCache, Annotation[][] methodParameterAnnotations, Object idOfUpdatedValue, Object updatedValue, Object... args) {
+        RemoveMode removeMode = updateCache.removeMode();
+        AddMode addMode = updateCache.addMode();
+        var cachedMethod = this.getCachedMethod();
+
+        if (addMode == AddMode.NONE && removeMode == RemoveMode.NONE) { //if none are set, use the underlying cache's
+            //Note how we don't do the same if only one of them is set to NONE: we use the implicit conditions in that case
+            removeMode = cachedMethod.getAnnotation(Cached.class).removeMode();
+            addMode = cachedMethod.getAnnotation(Cached.class).addMode();
+        }
+        String[] targetObjectKeyNamesAndValues = updateCache.targetObjectKeys();
+
+        var annotatedKeyNamesAndValues = getUpdateKeyNamesAndCorrespondingValues(methodParameterAnnotations, updateCache.annotatedKeys(), args);
+
+        var targetKeyNamesAndValues = linkTargetObjectKeysToObjects(List.of(targetObjectKeyNamesAndValues), updatedValue);
+        var key = getCompoundKeyForUpdate(annotatedKeyNamesAndValues, targetKeyNamesAndValues, updateCache.keyOrder(), cachedMethod, this.isSpecialCollectionHandlingEnabled());
+        if (!validArgs(cachedMethod, key)) { //If the compoundKey does not correspond to the underlying arguments, there is nothing to add preemptively
+            return; //TODO: Vres to lathos.
+        }
+
+        var explicitRemovalOnCondition = getCondition(updateCache.removeOnCondition(), annotatedKeyNamesAndValues, updatedValue, updateCache.conditionalANDGate());
+        var explicitAddOnCondition = getCondition(updateCache.addOnCondition(), annotatedKeyNamesAndValues, updatedValue, updateCache.conditionalANDGate());
+        var implicitRemoval = updateCache.complementaryCondition() && !explicitAddOnCondition;
+        var implicitAdd = updateCache.complementaryCondition() && !explicitRemovalOnCondition;
+
+        if (removeMode == RemoveMode.NONE && implicitRemoval) {
+            removeMode = RemoveMode.values()[updateCache.addMode().ordinal()];
+        }
+
+        if (addMode == AddMode.NONE && implicitAdd) {
+            addMode = AddMode.values()[updateCache.removeMode().ordinal()];
+        }
+
+        commonUpdater((ID) idOfUpdatedValue, (V) updatedValue, (K) key,
+                explicitAddOnCondition || implicitAdd, explicitRemovalOnCondition || implicitRemoval,
+                addMode, removeMode);
+    }
+
+    void updateCacheViaValuepoolUpdate(Object idOfUpdatedValue, Object updatedValue) {
+        Cached updateCache = this.getAnnotation();
+
+        var targetObjectKeyNamesAndValues = updateCache.targetObjectKeys();
+
+        var targetKeyNamesAndValues = linkTargetObjectKeysToObjects(List.of(targetObjectKeyNamesAndValues), updatedValue);
+
+        var explicitRemovalOnCondition = getCondition(updateCache.removeOnCondition(), Map.of(), updatedValue, updateCache.conditionalANDGate());
+        var explicitAddOnCondition = getCondition(updateCache.addOnCondition(), Map.of(), updatedValue, updateCache.conditionalANDGate());
+        var implicitRemoval = updateCache.complementaryCondition() && !explicitAddOnCondition;
+        var implicitAdd = updateCache.complementaryCondition() && !explicitRemovalOnCondition;
+
+        var removeMode = updateCache.removeMode();
+        if (removeMode == RemoveMode.NONE && implicitRemoval) {
+            removeMode = RemoveMode.values()[updateCache.addMode().ordinal()];
+        }
+
+        var addMode = updateCache.addMode();
+        if (addMode == AddMode.NONE && implicitAdd) {
+            addMode = AddMode.values()[updateCache.removeMode().ordinal()];
+        }
+
+        var key = getCompoundKeyForUpdate(null, targetKeyNamesAndValues, null, cachedMethod,
+                this.isSpecialCollectionHandlingEnabled());
+
+        commonUpdater((ID) idOfUpdatedValue, (V) updatedValue, (K) key,
+                explicitAddOnCondition || implicitAdd, explicitRemovalOnCondition || implicitRemoval,
+                addMode, removeMode);
+    }
+
+
+    private void commonUpdater(ID idOfUpdatedValue,
+                               V updatedValue, K key,
+                               boolean add, boolean remove,
+                               AddMode addMode, RemoveMode removeMode) {
+
+        if (idOfUpdatedValue == null && updatedValue == null) { //this can only happen on key removal.
+            updateByRemoving(key, null, add, removeMode);
+            return;
+        }
+        if (idOfUpdatedValue instanceof Map) { //This should be impossible with the new flow. TODO: Test and verify, and remove if so
+            updateByRemoving(key, (Map) idOfUpdatedValue, remove, removeMode);
+            updateByAdding(key, (Map) idOfUpdatedValue, add, addMode);
+        } else {
+            updateByRemoving(key, Map.of(idOfUpdatedValue, updatedValue), remove, removeMode);
+            updateByAdding(key, Map.of(idOfUpdatedValue, updatedValue), add, addMode);
+        }
+    }
+
+
+    LinkedHashMap<String, Object> getUpdateKeyNamesAndCorrespondingValues(Annotation[][] parameterAnnotations, String[] keyNames, Object[] args) {
+        var keyNameAndValue = new LinkedHashMap<String, Object>();
+        int i = 0;
+
+        for (Annotation[] annotations : parameterAnnotations) {
+            for (Annotation annotation : annotations) {
+                if (annotation.annotationType() == UpdateKey.class) {
+                    var idsOfInterest = Arrays.stream(keyNames).filter(id -> id.equals(((UpdateKey) annotation).keyId())).collect(Collectors.toSet());
+                    for (String id : idsOfInterest) {
+                        keyNameAndValue.put(id, args[i]);
+                    }
+                }
+            }
+            i += 1;
+        }
+
+        return keyNameAndValue;
+    }
+
+
     private void preemptiveAdd(Object compoundKey, Set<ID> ignore) { //HERE
         /*
           A 1-1 correspondence between keys and values is assumed for special-handling collections. But this is not the case for collections in general.
@@ -185,7 +302,12 @@ public class MnemoProxy<K, ID, V> {
            Which means that we may end up returning one value instead of e.g. fortythree if we update a non-special-handling cache without having called the underlying
            function at least once with the same key.
          */
+
+        if (!validArgs(cachedMethod, (CompoundKey) compoundKey)) { //If the compoundKey does not correspond to the underlying arguments, there is nothing to add preemptively
+            return;
+        }
         var returned = cache.getAll((K) compoundKey);
+
         if (returned == null || returned.isEmpty()) {
             var args = deduceArgsFromCompoundKey(cachedMethod, (CompoundKey) compoundKey);
             if (args == null) {
@@ -195,6 +317,31 @@ public class MnemoProxy<K, ID, V> {
             }
         }
     }
+
+    //TODO: Improve, and unit-test. May not work properly with variable args without annotation
+    private boolean validArgs(Method method, CompoundKey compoundKey) {
+        var kObjects = compoundKey.getKeyObjects();
+        if (kObjects.length != method.getParameterCount()) {
+            return false;
+        }
+        if (method.getParameterCount() == 1 && Collection.class.isAssignableFrom(method.getParameterTypes()[0])) {
+            //Hacking with Java reflections to fetch the inner type of a collection. E.g. for 'java.util.Set<java.util.UUID>', that would return 'java.util.UUID':
+            var innerTypeName = method.getGenericParameterTypes()[0].getTypeName().split("<")[1].replace("<", "").replace(">", "");
+            return (kObjects[0].getClass().getName().equals(innerTypeName));
+        }
+//TODO: If the function takes a Collection of objects T corresponding to the compoundKey... Return true.
+        var acceptable = true;
+        var types = MnemoCommon.getAnnotatedParamTypes(method, Key.class);
+        if (types.length == 0) {
+            types = method.getParameterTypes();
+        }
+        for (int i = 0; i < kObjects.length; i++) {
+            // kObjects.getClass().isAssignableFrom(types[i])
+            acceptable &= (kObjects[i].getClass().getName().equals(types[i].getName()) || isAssignableTo(kObjects[i].getClass(), types[i]));
+        }
+        return acceptable;
+    }
+
 
     private Object[] deduceArgsFromCompoundKey(Method method, CompoundKey compoundKey) {
         if (method.getParameters().length == 1) {
@@ -220,7 +367,7 @@ public class MnemoProxy<K, ID, V> {
 
     private Object fetchFromSeparateHandlingCache(CompoundKey compoundKey) {
         var keys = (Collection<K>) compoundKey.getKeyObjects()[0]; //In separate-handling collection-caches, the first compoundKey is not the key itself: it contains a Collection of the actual keys instead
-        var compoundKeys = (Collection<K>) keys.stream().map(k -> GeneralUtils.deduceCompoundKeyFromMethodAndArgs(this.cachedMethod, new Object[]{k})).toList(); //we need therefore to wrap each key around a compoundKey, because that is what we do everywhere else, and it will otherwise lead to a bug: a CompoundKey(value) is never equal to (value)
+        var compoundKeys = (Collection<K>) keys.stream().map(k -> MnemoCommon.deduceCompoundKeyFromMethodAndArgs(this.cachedMethod, new Object[]{k})).toList(); //we need therefore to wrap each key around a compoundKey, because that is what we do everywhere else, and it will otherwise lead to a bug: a CompoundKey(value) is never equal to (value)
         var resultCollection = cache.getAll(compoundKeys);
         if (resultCollection == null || resultCollection.isEmpty() || resultCollection.size() < keys.size() || resultCollection.contains(null)) {
             return null; //We don't know which key(s) did not have a cached value. So we return null, and do the separate handling afterwards.
@@ -231,7 +378,7 @@ public class MnemoProxy<K, ID, V> {
     private Map<ID, V> getSingleAndUpdate(CompoundKey compoundKey, Object... args) {
         var value = (V) invokeUnderlyingMethod(args);
         if (value != null) {
-            var id = (ID) GeneralUtils.deduceIdOrMap(value);
+            var id = (ID) MnemoCommon.deduceIdOrMap(value);
             valuePool.updateValueOrPutPreemptively(id, value);
             cache.put((K) compoundKey, (ID) id);
             return Map.of(id, value);
@@ -249,7 +396,7 @@ public class MnemoProxy<K, ID, V> {
         var value = invokeUnderlyingMethod(args);
         if (value != null) {
             assert (value instanceof Collection);
-            var map = (ConcurrentMap<ID, V>) GeneralUtils.deduceIdOrMap(value);
+            var map = (ConcurrentMap<ID, V>) MnemoCommon.deduceIdOrMap(value);
             ignored.forEach(map::remove);
             map.forEach(valuePool::updateValueOrPutPreemptively);
             cache.putAll((K) compoundKey, map.keySet());
@@ -262,22 +409,22 @@ public class MnemoProxy<K, ID, V> {
     private Map<ID, V> getMultipleSpecialAndUpdate(CompoundKey compoundKey, Object... args) {
         assert (specialCollectionHandlingEnabled && compoundKey.getKeyObjects().length == 1
                 && compoundKey.getKeyObjects()[0] instanceof Collection && args.length == 1); //A very specific but very common subcase: calling a repository or rest-api method with a single Collection of IDs as argument
-       // var returnTypeIsList = List.class.isAssignableFrom(cachedMethod.getReturnType());
+        // var returnTypeIsList = List.class.isAssignableFrom(cachedMethod.getReturnType());
         var keyTypeIsList = compoundKey.getKeyObjects()[0] instanceof List; // //Reminder that the Collection here may be only Set or List.
         var keys = (Collection<K>) compoundKey.getKeyObjects()[0]; //In this case, the compoundKey is not the key itself: it contains a Collection of the actual keys instead, created from the arguments given.
 
         List<K> failedKeys = Collections.synchronizedList(new ArrayList<K>()); //a list with the keys that did not return a value, i.e. returned empty collection or null.
-      //  var keyValueMap = new ConcurrentHashMap<K, V>();
+        //  var keyValueMap = new ConcurrentHashMap<K, V>();
         Map<ID, V> initiallyMissedFromCache = new ConcurrentHashMap<>();
         keys.stream()
                 .parallel()
                 .forEach(k -> { //Note again that k is not a compoundKey!
-                    var hit = (V) cache.get((K) GeneralUtils.deduceCompoundKeyFromMethodAndArgs(cachedMethod, new Object[]{k})); //reminder that (k) is never equal to CompoundKey(k), and since we wrap all (k)s around CompoundKeys everywhere else, we need to do so here too
+                    var hit = (V) cache.get((K) MnemoCommon.deduceCompoundKeyFromMethodAndArgs(cachedMethod, new Object[]{k})); //reminder that (k) is never equal to CompoundKey(k), and since we wrap all (k)s around CompoundKeys everywhere else, we need to do so here too
                     if (hit == null) {
                         failedKeys.add(k);
                     } else {
-                  //      keyValueMap.put(k, hit); //As noted in the documentation, a 1-1 correlation is assumed: one key corresponds to at most one value.
-                        initiallyMissedFromCache.put((ID) GeneralUtils.deduceIdOrMap(hit),hit);
+                        //      keyValueMap.put(k, hit); //As noted in the documentation, a 1-1 correlation is assumed: one key corresponds to at most one value.
+                        initiallyMissedFromCache.put((ID) MnemoCommon.deduceIdOrMap(hit), hit);
                     }
                 });
 
@@ -288,7 +435,7 @@ public class MnemoProxy<K, ID, V> {
                                 var callWith = keyTypeIsList ? Collections.singletonList(failedKey) : Collections.singleton(failedKey);  //invoke with singleton List or Set.
                                 var value = invokeUnderlyingMethod(callWith);
                                 if (value == null) {
-                                  //  keyValueMap.put(failedKey, null);
+                                    //  keyValueMap.put(failedKey, null);
                                 } else {
                                     assert (value instanceof Collection); //TODO: Add this to generalControls and delete here.
                                     var valueCollection = (Collection<V>) value;
@@ -296,12 +443,12 @@ public class MnemoProxy<K, ID, V> {
                                         //Add nothing to the cache or the result. It is apparent that the method is "null-aversive" and just ignores the values that were not found. So just do the same.
                                     } else {
                                         assert (valueCollection.size() == 1); //1-1 correlation violated otherwise! It was called with a singletonList, so at most one value is expected if we have a 1-1 correlation
-                                        var id = (ID) GeneralUtils.deduceIdOrMap(valueCollection.toArray()[0]);
+                                        var id = (ID) MnemoCommon.deduceIdOrMap(valueCollection.toArray()[0]);
                                         var val = (V) valueCollection.toArray()[0];
                                         initiallyMissedFromCache.put(id, val);
                                         valuePool.updateValueOrPutPreemptively(id, val);
-                                        cache.put((K) GeneralUtils.deduceCompoundKeyFromMethodAndArgs(cachedMethod, new Object[]{failedKey}), id);
-                                      //  keyValueMap.put(failedKey, Iterables.get(valueCollection, 0));
+                                        cache.put((K) MnemoCommon.deduceCompoundKeyFromMethodAndArgs(cachedMethod, new Object[]{failedKey}), id);
+                                        //  keyValueMap.put(failedKey, Iterables.get(valueCollection, 0));
                                     }
                                 }
                             }
