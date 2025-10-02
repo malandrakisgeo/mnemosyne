@@ -203,7 +203,7 @@ public class MnemoProxy<K, ID, V> {
         var targetKeyNamesAndValues = linkTargetObjectKeysToObjects(List.of(targetObjectKeyNamesAndValues), updatedValue);
         var key = getCompoundKeyForUpdate(annotatedKeyNamesAndValues, targetKeyNamesAndValues, updateCache.keyOrder(), cachedMethod, this.isSpecialCollectionHandlingEnabled());
         if (!validArgs(cachedMethod, key)) { //If the compoundKey does not correspond to the underlying arguments, there is nothing to add preemptively
-            //    return; //TODO: Vres to lathos.
+            return; //TODO: Vres to lathos.
         }
 
         var explicitRemovalOnCondition = getCondition(updateCache.removeOnCondition(), annotatedKeyNamesAndValues, updatedValue, updateCache.conditionalANDGate());
@@ -324,7 +324,12 @@ public class MnemoProxy<K, ID, V> {
         if (kObjects.length != method.getParameterCount()) {
             return false;
         }
-
+        if (method.getParameterCount() == 1 && Collection.class.isAssignableFrom(method.getParameterTypes()[0])) {
+            //Hacking with Java reflections to fetch the inner type of a collection. E.g. for 'java.util.Set<java.util.UUID>', that would return 'java.util.UUID':
+            var innerTypeName = method.getGenericParameterTypes()[0].getTypeName().split("<")[1].replace("<", "").replace(">", "");
+            return (kObjects[0].getClass().getName().equals(innerTypeName));
+        }
+//TODO: If the function takes a Collection of objects T corresponding to the compoundKey... Return true.
         var acceptable = true;
         var types = MnemoCommon.getAnnotatedParamTypes(method, Key.class);
         if (types.length == 0) {
