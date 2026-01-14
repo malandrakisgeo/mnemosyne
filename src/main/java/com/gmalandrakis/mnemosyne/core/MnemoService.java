@@ -41,7 +41,7 @@ public class MnemoService {
     public Object invokeMethodAndUpdateValuePool(Method method, Object obj, Object... args) {
         Object object = null;
         try {
-            object = method.invoke(obj, args);
+            object = method.invoke(obj, args); //PROBLEM-THREAD:1
         } catch (IllegalAccessException | InvocationTargetException e) {
             throw new RuntimeException(e);
         }
@@ -119,7 +119,9 @@ public class MnemoService {
         var clazz = singletonBean.getClass();
         Arrays.stream(clazz.getDeclaredMethods())
                 .filter(m -> m.getAnnotation(UpdatesCache.class) != null)
-                .forEach(this::generateUpdaterForMethod);
+                .forEach(m->{
+                    updateControls(m, m.getAnnotation(UpdatesCache.class));
+                });
     }
 
     MnemoProxy generateForMethod(Method method, Object singletonBean) {
@@ -130,12 +132,6 @@ public class MnemoService {
         return null;
     }
 
-    void generateUpdaterForMethod(Method method) {
-        var annotation = method.getAnnotation(UpdatesCache.class);
-        if (annotation != null) {
-            updateControls(method, annotation);
-        }
-    }
 
     Object tryFetchFromCache(MnemoProxy cacheProxy, Object... args) { //Used for improved testability
         assert (cacheProxy != null);

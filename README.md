@@ -1,4 +1,4 @@
-### The project is under development and testing as of 10/2025.
+### The project is under development and testing
 
 # Mnemosyne
 Mnemosyne is a small and customizable cache library for Java applications.
@@ -146,6 +146,9 @@ by extending the AbstractMnemosyneCache class and implementing its' abstract met
 AbstractMnemosyneCache provides a specification of what mnemosyne expects from a caching algorithm in order to function.
 Any cache algorithm following this specification should be able to work with mnemosyne without problems.
 
+### Precautions
+See Docs.md
+
 
 ## Future plans
 Ideally, mnemosyne will become a full-fledged, high-performance, distributed cache easy to integrate with any kind of Java EE project.
@@ -163,13 +166,18 @@ But this is nothing one person can achieve alone, so feel free to contribute!
 
 ### Mini TODOs
 Well, dozens! From changing variable names to deciding when to update asynchronously.
-You may find some in the issues too.
+You will find them in the code. You may find some in the issues too.
 
-### TODOs under discusssion
+### TODOs under discussion
 * Add support for custom ID deduction (which solves the proxy problem)
 * Add support for records
 
 ## Further documentation
-As of 10/2025, most of the documentation is provided in the code itself as javadoc.
+Most of the documentation is provided in the code itself as javadoc.
 Running mvn javadoc:javadoc should suffice to generate a webpage with a general description.
-You may also check the Docs.md (which is under construction)
+We strongly suggest that you read the precautions in Docs.md (which is under construction)
+
+## Contributing
+As of 2026, this remains an AI-free repository. Vibe coding is not strictly forbidden,
+but we strongly encourage you to stick to brain-coding, grasp the problem, and solve it using your capabilities
+instead of an LLM. 

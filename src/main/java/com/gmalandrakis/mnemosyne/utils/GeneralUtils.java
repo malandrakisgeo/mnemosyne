@@ -28,7 +28,7 @@ public class GeneralUtils {
             field.setAccessible(true);
             return field.get(targetObject);
         } catch (NoSuchFieldException | IllegalAccessException e) {
-            String[] prefixes = {"", "get", "is", "fetch", "has", "find"};
+            String[] prefixes = {"", "get", "is", "fetch", "has", "find", "findBy"};
             for (String prefix : prefixes) {
                 try {
                     var method = targetClass.getMethod(prefix + capitalizedKeyName);
