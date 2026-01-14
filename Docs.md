@@ -13,7 +13,7 @@
 ## Precautions
 
 ### Proxy objects
-As of 10/2025, mnemosyne's default caching algorithms may not work properly with proxy objects.
+Mnemosyne's default caching algorithms may not work properly with proxy objects.
 
 Many frameworks and libraries for databases or REST- and SOAP-based services, wrap the returned values in proxy objects
 that often lack a particular ID. There is a TODO on enabling support for enabling custom ID deduction, but
@@ -23,7 +23,7 @@ Deactivating proxy objects differs from framework to framework, (e.g. in Hiberna
 Please check the documentation of the framework/library you use.
 
 ### Collections as keys
-As of 10/2025, methods that take a Collection as an argument will work properly only if they are an abstract Collection, Set, or List.
+Methods that take a Collection as an argument will work properly only if they are an abstract Collection, Set, or List.
 Using a concrete subclass, like e.g. ArrayList or HashSet, is explicitly forbidden in case you want to use special collection handling and will result to a RuntimeException.
 
 When no special collection handling is enabled, though the use of e.g. ArrayLists is not forbidden, it may result to update discrepancies if another method updates the cached one via an @UpdatesCache annotation: the objects being updates via an @UpdatesCache annotation
@@ -52,6 +52,25 @@ It would be more prudent to cache an underlying method that takes each sellerId 
     public List<Transaction> getTransactionsBySellersDoneWrong(List<String> sellerIds) { //It would work perfectly with special handling enabled, but that requires a 1-1 correlation between sellerIds and Transactions.
         return repository.getTransactionsBySellerIds(sellerIds);
     }
+
+### Updating the same cache from multiple methods with argument-based updated values in a multithreaded environment
+
+Suppose you have two *void* methods A and B that update the same cache in a multithreaded environment.
+What happens if they are called on the same millisecond with two different versions of an object with the same ID?
+
+It may be quite an uncommon scenario, but it still has a non-zero probability.
+If the underlying DB or service throws an exception, well, great! The version that led to the exception will not be cached.
+
+But if the underlying DB or service does not throw an exception and somehow merges the two versions into one (after all, they may
+update different fields), we have some bad news: you will end up with a cache discrepancy.
+
+If the uncommon scenario of two different *void* methods updating the very same data on the same millisecond,
+without causing an exception, is probable in your application, we strongly encourage you
+to:
+1. Either cache a common underlying method, if possible
+2. Or remove the @UpdatedValue annotation from the methods and make them return the merged object that was saved.
+   Mnemosyne will then store the merged objects instead of the ones given as arguments.
+
 
 Overcoming these limitations is a TODO.
 
