@@ -12,6 +12,7 @@ import java.util.stream.Collectors;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
 public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
+    //This isn't a proper LRU. I don't know what I had in my mind when I called this an LRU policy. TODO: Replace with a proper LRU
 
     final ConcurrentHashMap<ID, Integer> numberOfUsesById = new ConcurrentHashMap<ID, Integer>();
 
@@ -89,10 +90,10 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
 
     @Override
     public T get(K key) {
-        if (!keyIdMapper.containsKey(key)) {
-            return null;
-        }
         synchronized (keyIdMapper) {
+            if (!keyIdMapper.containsKey(key)) {
+                return null;
+            }
             var id = ((SingleIdWrapper) keyIdMapper.get(key)).getId();
             return valuePool.getValue((ID) id);
         }
@@ -200,15 +201,23 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
             expiredValues.forEach(this::remove);
         }
 
-        while (numberOfUsesById.size() >= this.actualCapacity) {
-            var it = keyIdMapper.entrySet().iterator();
-            K lastKey = it.next().getKey(); //get first
+        if (numberOfUsesById.size() >= this.actualCapacity) {
+            var sortedList = keyIdMapper.entrySet().stream().sorted((a, b) -> {
+                long A;
+                long B;
 
-            if (lastKey != null) {
-                remove(lastKey);
-            } else {
-                break;
-            }
+                if (!countdownFromCreation) {
+                    A = a.getValue().getLastAccessed();
+                    B = b.getValue().getLastAccessed();
+                } else {
+                    A = a.getValue().getCreatedOn();
+                    B = b.getValue().getCreatedOn();
+                }
+                return A - B > 0 ? 1 : -1; //it deliberately does not return 0. TODO: Make it take into account both creation and last access time, before returning anything
+
+            }).toList().subList(0, (int) (numberOfUsesById.size() - this.actualCapacity));
+
+            sortedList.forEach(e -> remove(e.getKey()));
         }
     }
 
@@ -239,7 +248,7 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
                 for (K k : keyIdMapper.keySet()) {
                     if (((SingleIdWrapper) k).getId().equals(id)) {
                         relatedKeys.add(k);
-                        removeOrDecreaseIdUses(id);
+                        removeOrDecreaseIdUses(id); //TODO: This is not necessary. It should be done in the remove() already
                     }
                 }
             } else {
