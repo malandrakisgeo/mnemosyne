@@ -11,6 +11,7 @@ public class CacheValue<T> {
     private long createdOn;
     private long lastUpdated;
     private T value;
+    //The number of hits is ID-specific.
 
 
     public CacheValue(T t, boolean addedPreemptively) {

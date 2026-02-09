@@ -20,7 +20,7 @@ public abstract class IdWrapper<ID> {
      * <p>
      * You may use explicit calls to updateLastAccessed() in custom implementations of AbstractMnemosyneCache for updating the timestamp even when updating the value.
      */
-    long lastAccessed;
+    long lastAccessed; //TODO:either don't update it via automated procedures, or make two separate lastUserAccessed and lastSystemAccessed
 
     /**
      * Timestamp of creation time.
@@ -37,6 +37,11 @@ public abstract class IdWrapper<ID> {
      */
     int hits;
 
+    /**
+     * Some eviction algorithms, e.g. S3-FIFO, set an upper hit limit whereupon the number of hits ought not be further increased.
+     */
+    int upperHitLimit;
+
     public void updateLastAccessed() {
         this.lastAccessed = System.currentTimeMillis();
     }
@@ -46,7 +51,9 @@ public abstract class IdWrapper<ID> {
     }
 
     public synchronized void increaseHits() {
-        hits += 1;
+        if (upperHitLimit == 0 || hits <= upperHitLimit) {
+            hits += 1;
+        }
     }
 
     public int getHits() {
@@ -55,5 +62,13 @@ public abstract class IdWrapper<ID> {
 
     public long getCreatedOn() {
         return createdOn;
+    }
+
+    public int getUpperHitLimit() {
+        return upperHitLimit;
+    }
+
+    public void setUpperHitLimit(int upperHitLimit) {
+        this.upperHitLimit = upperHitLimit;
     }
 }

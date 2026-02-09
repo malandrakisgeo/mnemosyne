@@ -1,0 +1,20 @@
+//TODO: Multiple updatesCache for the same target method is allowed, but what if they clash? See if it is better to check for controls,
+disable multiple updatesCache for the same  target method, or just print a warning.
+
+PROBLEM-THREAD:1
+
+An ena updatesCache klithei xwris kanena allo antistoixo epi ths idias cache na kaleitai tautoxrona den tha exeis kanena thema (me 95% sigoura -kan'thn 100%).
+An omws duo h perissotera updatescache epi ths idias cache klithoun tautoxrona, tote exoume oops.
+
+TODO1: Des kata poson arkei to synchronized sto updateValue
+
+Einai sxedon apithano na arkei, kathws
+ta invokeMethodAndUpdateValuePool, invokeMethodAndUpdate mporei na klithoun epi ths idias cache apo threads A,B, opou to invocation B oloklhrwnetai nwritera apo tou A.
+Thewroume oti to underlying project me kapoio tropo diorthwnei ta version conflicts kai sugxwneuei tis diafores versions sth vash dedomenwn.
+Tha katalhksoume na exoume th version tou thread A sto ValuePool.
+
+Pithanh lush: dhmiourgia updateQueue gia thn ekastote cache, opou oi theseis sto queue eksartwntai apo th klhsh kai oxi thn oloklhrwsh ths.
+
+
+
+
