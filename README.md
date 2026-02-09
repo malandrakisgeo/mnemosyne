@@ -20,7 +20,7 @@ Mnemosyne is designed with these considerations in mind.
 
 The basic structure of mnemosyne is easy to understand with a practical example: an application that caches transactions.
 
-![Mnemosyne structure](mnemosyne-plane.png?raw=true)
+![Mnemosyne structure](mnemosyne-plan.png?raw=true)
 
 When an application calls a Method cached by mnemosyne, the arguments are assembled to a CompoundKey. The CompoundKey is then used
 to retrieve from a local mnemosyne cache the IDs of the objects to be returned. These objects are stored in a common
