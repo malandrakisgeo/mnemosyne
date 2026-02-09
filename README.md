@@ -20,7 +20,7 @@ Mnemosyne is designed with these considerations in mind.
 
 The basic structure of mnemosyne is easy to understand with a practical example: an application that caches transactions.
 
-![Mnemosyne structure](structure-by-example.png?raw=true)
+![Mnemosyne structure](mnemosyne-plane.png?raw=true)
 
 When an application calls a Method cached by mnemosyne, the arguments are assembled to a CompoundKey. The CompoundKey is then used
 to retrieve from a local mnemosyne cache the IDs of the objects to be returned. These objects are stored in a common
@@ -139,7 +139,7 @@ CompoundKey used to retrieve the actual cache values.
 
 ### Implementing custom caching algorithms
 
-As of 10/2025 a generic implementation of a FIFO and an LRU are provided by mnemosyne. An S3-FIFO and an LFU are under construction.
+A generic implementation of a FIFO and an LRU-like policy are provided by mnemosyne. An S3-FIFO, a proper LRU, and an LFU are under construction.
 But since many projects have domain-specific needs and eviction policies, users are able to implement their own caching algorithms
 by extending the AbstractMnemosyneCache class and implementing its' abstract methods.
 
