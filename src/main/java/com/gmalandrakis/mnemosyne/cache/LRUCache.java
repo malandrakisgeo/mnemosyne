@@ -15,7 +15,7 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
     //This isn't a proper LRU. I don't know what I had in my mind when I called this an LRU policy. TODO: Replace with a proper LRU
 
     final LinkedList<K> keyOrder = new LinkedList<>();
-    final Object lock = new Object(); //TODO: Replace with reentrant lock
+    final Object lock = new Object(); //TODO: Perhaps replace with reentrant lock?
 
     final ConcurrentHashMap<ID, Integer> numberOfUsesById = new ConcurrentHashMap<ID, Integer>();
 
@@ -36,8 +36,8 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
 
         var possibleValue = (CollectionIdWrapper<ID>) keyIdMapper.computeIfAbsent(key, k -> new CollectionIdWrapper<>());
         possibleValue.addAllToCollectionOrUpdate(map);
-        updateKeyOrderOnInsertion(key);
 
+        updateKeyOrderOnInsertion(key);
         map.forEach(this::addOrUpdateIdAndValue);
     }
 
@@ -49,14 +49,13 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
         var in = numberOfUsesById.get(id);
         var initialNumOfUses = in == null ? 0 : in;
         int i = initialNumOfUses;
-        synchronized (lock) {
-            for (K k : keyIdMapper.keySet()) {
-                var idWrapper = ((CollectionIdWrapper) keyIdMapper.get(k));
-                if (idWrapper.addToCollectionOrUpdate(id)) {
-                    numberOfUsesById.put(id, ++i);
-                }
+        for (K k : keyIdMapper.keySet()) {
+            var idWrapper = ((CollectionIdWrapper) keyIdMapper.get(k));
+            if (idWrapper.addToCollectionOrUpdate(id)) {
+                numberOfUsesById.put(id, ++i);
             }
         }
+
         valuePool.put(id, initialNumOfUses == 0);
     }
 
@@ -129,7 +128,7 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
             } else {
                 var res = get(k);
                 if (res != null) {
-                    all.add(get(k));
+                    all.add(res);
                 }
             }
         }
