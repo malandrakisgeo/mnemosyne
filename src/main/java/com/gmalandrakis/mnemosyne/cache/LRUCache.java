@@ -14,6 +14,9 @@ import java.util.stream.Collectors;
 public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
     //This isn't a proper LRU. I don't know what I had in my mind when I called this an LRU policy. TODO: Replace with a proper LRU
 
+    final LinkedList<K> keyOrder = new LinkedList<>();
+    final Object lock = new Object(); //TODO: Replace with reentrant lock
+
     final ConcurrentHashMap<ID, Integer> numberOfUsesById = new ConcurrentHashMap<ID, Integer>();
 
     public LRUCache(CacheParameters cacheParameters, ValuePool poolService) {
@@ -30,11 +33,10 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
         if (keyIdMapper.size() >= this.actualCapacity) {
             this.evict();
         }
-        //We avoid iterative calls to put(), to avoid checking the keyIdMapper multiple times. One time suffices.
-        synchronized (keyIdMapper) {
-            var possibleValue = (CollectionIdWrapper<ID>) keyIdMapper.computeIfAbsent(key, k -> new CollectionIdWrapper<>());
-            possibleValue.addAllToCollectionOrUpdate(map);
-        }
+
+        var possibleValue = (CollectionIdWrapper<ID>) keyIdMapper.computeIfAbsent(key, k -> new CollectionIdWrapper<>());
+        possibleValue.addAllToCollectionOrUpdate(map);
+        updateKeyOrderOnInsertion(key);
 
         map.forEach(this::addOrUpdateIdAndValue);
     }
@@ -47,7 +49,7 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
         var in = numberOfUsesById.get(id);
         var initialNumOfUses = in == null ? 0 : in;
         int i = initialNumOfUses;
-        synchronized (keyIdMapper) {
+        synchronized (lock) {
             for (K k : keyIdMapper.keySet()) {
                 var idWrapper = ((CollectionIdWrapper) keyIdMapper.get(k));
                 if (idWrapper.addToCollectionOrUpdate(id)) {
@@ -66,37 +68,40 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
         if (keyIdMapper.size() >= this.actualCapacity) {
             this.evict();
         }
-        synchronized (keyIdMapper) {
 
-            if (returnsCollection) {
-                var idWrapper = (CollectionIdWrapper) keyIdMapper.computeIfAbsent(key, k -> new CollectionIdWrapper());
-                idWrapper.addToCollectionOrUpdate(id); //Unlike single-value caches, removing an old ID from a collection cache is not as simple as just replacing it a newer one. Only a manual call to removeOneFromCollection() or expiration can remove it.
-            } else {
-                var idWrapper = keyIdMapper.get(key);
-                if (idWrapper != null) {
-                    var oldId = (ID) ((SingleIdWrapper) idWrapper).getId();
-                    if (oldId.equals(id)) {
-                        valuePool.put(id, false); //just update the current value
-                        return;
-                    }
-                    removeOrDecreaseIdUses(oldId);
+        if (returnsCollection) {
+            var idWrapper = (CollectionIdWrapper) keyIdMapper.computeIfAbsent(key, k -> new CollectionIdWrapper());
+            idWrapper.addToCollectionOrUpdate(id); //Unlike single-value caches, removing an old ID from a collection cache is not as simple as just replacing it a newer one. Only a manual call to removeOneFromCollection() or expiration can remove it.
+        } else {
+            var idWrapper = keyIdMapper.get(key);
+            if (idWrapper != null) {
+                var oldId = (ID) ((SingleIdWrapper) idWrapper).getId();
+                if (oldId.equals(id)) {
+                    valuePool.put(id, false); //just update the current value
+                    return;
                 }
-                keyIdMapper.put(key, new SingleIdWrapper<ID>(id)); //if we used putIfAbsent, we would prevent the key from being updated with a brand new ID/value
+                removeOrDecreaseIdUses(oldId);
             }
+            keyIdMapper.put(key, new SingleIdWrapper<ID>(id)); //if we used putIfAbsent, we would prevent the key from being updated with a brand new ID/value
         }
+        updateKeyOrderOnInsertion(key);
         addOrUpdateIdAndValue(id);
-
     }
 
     @Override
     public T get(K key) {
-        synchronized (keyIdMapper) {
-            if (!keyIdMapper.containsKey(key)) {
-                return null;
-            }
-            var id = ((SingleIdWrapper) keyIdMapper.get(key)).getId();
-            return valuePool.getValue((ID) id);
+        var val = keyIdMapper.get(key);
+        if (val == null) {
+            return null;
         }
+        if (!countdownFromCreation) {
+            moveToTail(key);
+        }
+        //TODO: Perhaps a cacheIdData with single Id could be used when handleCollectionKeysSeparately.
+        ID id = (ID) (handleCollectionKeysSeparately ? ((CollectionIdWrapper) val).getIds().toArray()[0] : ((SingleIdWrapper) val).getId()); //EDW: dunhtika buggara
+        //  var id = ((SingleIdWrapper) val).getId();
+        return valuePool.getValue((ID) id);
+
     }
 
     @Override
@@ -104,47 +109,44 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
         if (!returnsCollection || !keyIdMapper.containsKey(key)) {
             return Collections.emptyList();
         }
-        synchronized (keyIdMapper) {
-            var ids = ((CollectionIdWrapper) keyIdMapper.get(key));
-            if (ids != null) {
-                return valuePool.getAll(ids.getIds());
-            }
+        var ids = ((CollectionIdWrapper) keyIdMapper.get(key));
+        if (!countdownFromCreation) {
+            moveToTail(key);
+        }
+        if (ids != null) {
+            return valuePool.getAll(ids.getIds());
         }
         return Collections.emptyList();
     }
 
     @Override
+
     public Collection<T> getAll(Collection<K> key) {
         var all = new HashSet<T>();
-        synchronized (keyIdMapper) { //we avoid iterated calls to get() or getAll(K key) because we need to lock only once for the whole procedure.
-            for (K k : key) {
-                if (returnsCollection) {
-                    var p = this.keyIdMapper.get(k);
-                    if (p != null) {
-                        var ids = ((CollectionIdWrapper) p).getIds();
-                        all.addAll(valuePool.getAll(ids));
-                    }
-                } else {
-                    var p = this.keyIdMapper.get(k);
-                    if (p != null) {
-                        var id = ((SingleIdWrapper) p).getId();
-                        all.add(valuePool.getValue((ID) id));
-                    }
+        for (K k : key) {
+            if (returnsCollection) {
+                all.addAll(getAll(k));
+            } else {
+                var res = get(k);
+                if (res != null) {
+                    all.add(get(k));
                 }
             }
         }
+
         return all;
     }
 
     @Override
     public void remove(K key) {
         IdWrapper<ID> cacheData;
-        synchronized (keyIdMapper) {
-            cacheData = keyIdMapper.get(key);
-            if (cacheData == null) {
-                return;
-            }
+        cacheData = keyIdMapper.get(key);
+        if (cacheData == null) {
+            return;
+        }
+        synchronized (lock) {
             keyIdMapper.remove(key);
+            keyOrder.remove(key);
         }
         if (returnsCollection) {
             Collection<ID> ids = ((CollectionIdWrapper) cacheData).getIds();
@@ -165,17 +167,19 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
         } else {
             CollectionIdWrapper<ID> cacheData;
 
-            synchronized (keyIdMapper) {
-                cacheData = (CollectionIdWrapper) keyIdMapper.get(key);
-                if (cacheData == null) {
-                    return;
-                }
+            cacheData = (CollectionIdWrapper) keyIdMapper.get(key);
+            if (cacheData == null) {
+                return;
             }
+
             if (cacheData.getIds().remove(id)) {
                 removeOrDecreaseIdUses(id);
             }
             if (cacheData.getIds().isEmpty()) {
-                keyIdMapper.remove(key);
+                synchronized (lock) {
+                    keyIdMapper.remove(key);
+                    keyOrder.remove(key);
+                }
             }
         }
     }
@@ -194,43 +198,26 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
     @Override
     public void evict() {
         if (timeToLive != Long.MAX_VALUE && timeToLive > 0) {
-            Set<K> expiredValues;
-            synchronized (keyIdMapper) {
-                expiredValues = keyIdMapper.entrySet().stream().filter(this::isExpired).map(Map.Entry::getKey).collect(Collectors.toSet());
-            }
+            Set<K> expiredValues = keyIdMapper.entrySet().stream().filter(this::isExpired).map(Map.Entry::getKey).collect(Collectors.toSet());
             expiredValues.forEach(this::remove);
         }
 
-        if (numberOfUsesById.size() >= this.actualCapacity) {
-            var sortedList = keyIdMapper.entrySet().stream().sorted((a, b) -> {
-                long A;
-                long B;
-
-                if (!countdownFromCreation) {
-                    A = a.getValue().getLastAccessed();
-                    B = b.getValue().getLastAccessed();
-                } else {
-                    A = a.getValue().getCreatedOn();
-                    B = b.getValue().getCreatedOn();
-                }
-                return A - B > 0 ? 1 : -1; //it deliberately does not return 0. TODO: Make it take into account both creation and last access time, before returning anything
-
-            }).toList().subList(0, (int) (numberOfUsesById.size() - this.actualCapacity));
-
-            sortedList.forEach(e -> remove(e.getKey()));
+        while (numberOfUsesById.size() >= this.actualCapacity) {
+            synchronized (lock) {
+                remove(keyOrder.getFirst());  //If an NPE or NSE occurs here, the bug is deeper.
+            }
         }
     }
 
     @Override
     public void invalidateCache() {
         List<K> keyList;
-        synchronized (keyIdMapper) {
-            keyList = keyIdMapper.keySet().stream().toList();
-        }
+        keyList = keyIdMapper.keySet().stream().toList();
+
         for (K k : keyList) {
             this.remove(k);
         }
-
+        assert (keyOrder.isEmpty()); //TODO: Perhaps throw exception with message if this happens
     }
 
     @Override
@@ -248,7 +235,7 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
                 for (K k : keyIdMapper.keySet()) {
                     if (((SingleIdWrapper) k).getId().equals(id)) {
                         relatedKeys.add(k);
-                        removeOrDecreaseIdUses(id); //TODO: This is not necessary. It should be done in the remove() already
+                        removeOrDecreaseIdUses(id);
                     }
                 }
             } else {
@@ -266,9 +253,12 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
         }
 
         if (handleCollectionKeysSeparately || !returnsCollection) { //on special collection handling, a key corresponds to at most one ID
-            relatedKeys.forEach(k -> {
-                keyIdMapper.remove(k);
-            });
+            synchronized (lock) {
+                relatedKeys.forEach(k -> {
+                    keyIdMapper.remove(k);
+                    keyOrder.remove(k);
+                });
+            }
         }
     }
 
@@ -289,4 +279,25 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
         numberOfUsesById.put(id, ++usesOfIdInCache);
         valuePool.put(id, !idAlreadyInCache);
     }
+
+    private void updateKeyOrderOnInsertion(K key) {
+        synchronized (lock) {
+            if (!countdownFromCreation) { //access-defined LRU
+                if (!keyOrder.contains(key)) {
+                    keyOrder.add(key);
+                }
+            } else {
+                keyOrder.remove(key); //remove if present
+                keyOrder.add(key);
+            }
+        }
+    }
+
+    private void moveToTail(K key) {
+        synchronized (lock) {
+            keyOrder.remove(key);
+            keyOrder.add(key);
+        }
+    }
+
 }
