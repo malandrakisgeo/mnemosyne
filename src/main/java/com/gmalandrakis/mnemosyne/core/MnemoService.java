@@ -187,7 +187,6 @@ public class MnemoService {
             var ids = idObjectMap.keySet();
 
             proxies.values().forEach(p -> {
-                //TODO: BUG: We do not take into account conditional removal.
                 p.cache.removeById(ids); //will be removed from valuepool via the local caches, along with the ID from them.
             });
         } else {

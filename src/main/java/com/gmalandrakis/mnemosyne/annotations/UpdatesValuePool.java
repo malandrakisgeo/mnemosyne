@@ -19,7 +19,8 @@ import static java.lang.annotation.ElementType.METHOD;
 public @interface UpdatesValuePool {
     /**
      * If true, the values returned or annotated as @UpdatedValue are removed from the value pool
-     * and all caches that contain them.
+     * and all caches that contain them. Note that in this case, local cache conditions <b>are not taken into account</b>. The value is
+     * removed from all caches with no condition check.
      */
     boolean remove() default false;
 
