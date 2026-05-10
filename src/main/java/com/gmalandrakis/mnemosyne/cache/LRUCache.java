@@ -12,8 +12,6 @@ import java.util.stream.Collectors;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
 public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
-    //This isn't a proper LRU. I don't know what I had in my mind when I called this an LRU policy. TODO: Replace with a proper LRU
-
     final LinkedList<K> keyOrder = new LinkedList<>();
     final Object lock = new Object(); //TODO: Perhaps replace with reentrant lock?
 
@@ -22,7 +20,6 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
     public LRUCache(CacheParameters cacheParameters, ValuePool poolService) {
         super(cacheParameters, poolService);
         this.keyIdMapper = new LinkedHashMap<K, IdWrapper<ID>>(totalCapacity, 0.75F, true);
-
     }
 
     @Override
@@ -30,10 +27,9 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
         if (key == null || map == null || !returnsCollection) {
             return;
         }
-        if (keyIdMapper.size() >= this.actualCapacity) {
+        if (keyIdMapper.size() >= Math.round(this.actualCapacity)) {
             this.evict();
         }
-
         var possibleValue = (CollectionIdWrapper<ID>) keyIdMapper.computeIfAbsent(key, k -> new CollectionIdWrapper<>());
         possibleValue.addAllToCollectionOrUpdate(map);
 
@@ -64,13 +60,14 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
         if (key == null || id == null) {
             return;
         }
-        if (keyIdMapper.size() >= this.actualCapacity) {
+        if (keyIdMapper.size() >= Math.round(this.actualCapacity)) {
             this.evict();
         }
 
         if (returnsCollection) {
             var idWrapper = (CollectionIdWrapper) keyIdMapper.computeIfAbsent(key, k -> new CollectionIdWrapper());
             idWrapper.addToCollectionOrUpdate(id); //Unlike single-value caches, removing an old ID from a collection cache is not as simple as just replacing it a newer one. Only a manual call to removeOneFromCollection() or expiration can remove it.
+
         } else {
             var idWrapper = keyIdMapper.get(key);
             if (idWrapper != null) {
@@ -81,7 +78,9 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
                 }
                 removeOrDecreaseIdUses(oldId);
             }
-            keyIdMapper.put(key, new SingleIdWrapper<ID>(id)); //if we used putIfAbsent, we would prevent the key from being updated with a brand new ID/value
+            synchronized (lock) {
+                keyIdMapper.put(key, new SingleIdWrapper<ID>(id)); //if we used putIfAbsent, we would prevent the key from being updated with a brand new ID/value
+            }
         }
         updateKeyOrderOnInsertion(key);
         addOrUpdateIdAndValue(id);
@@ -201,7 +200,7 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
             expiredValues.forEach(this::remove);
         }
 
-        while (numberOfUsesById.size() >= this.actualCapacity) {
+        while (numberOfUsesById.size() >= Math.round(this.actualCapacity)) {
             synchronized (lock) {
                 remove(keyOrder.getFirst());  //If an NPE or NSE occurs here, the bug is deeper.
             }
@@ -230,22 +229,27 @@ public class LRUCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
         var relatedKeys = new HashSet<K>();
 
         for (ID id : ids) {
-            if (!returnsCollection) {
-                for (K k : keyIdMapper.keySet()) {
-                    if (((SingleIdWrapper) k).getId().equals(id)) {
-                        relatedKeys.add(k);
-                        removeOrDecreaseIdUses(id);
-                    }
-                }
-            } else {
-                for (K k : keyIdMapper.keySet()) {
-                    var savedIds = ((CollectionIdWrapper) keyIdMapper.get(k)).getIds();
-                    var deleted = savedIds.remove(id);
-                    if (deleted) {
-                        if (savedIds.isEmpty()) {
+            synchronized (lock) {
+                //TODO: The independentKeySet should not be necessary. We created it to avoid concurrent modifications errors, but we shouldn't need it.
+                var independentKeyset = new ArrayList<K>(keyIdMapper.keySet());
+
+                if (!returnsCollection) {
+                    for (K k : independentKeyset) {
+                        if (((SingleIdWrapper) keyIdMapper.get(k)).getId().equals(id)) { //TODO: If you keep independentKeyset, add NP controls here
                             relatedKeys.add(k);
+                            removeOrDecreaseIdUses(id);
                         }
-                        removeOrDecreaseIdUses(id);
+                    }
+                } else {
+                    for (K k : independentKeyset) {
+                        var savedIds = ((CollectionIdWrapper) keyIdMapper.get(k)).getIds(); //TODO: If you keep independentKeyset, add NP controls here
+                        var deleted = savedIds.remove(id);
+                        if (deleted) {
+                            if (savedIds.isEmpty()) {
+                                relatedKeys.add(k);
+                            }
+                            removeOrDecreaseIdUses(id);
+                        }
                     }
                 }
             }

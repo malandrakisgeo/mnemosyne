@@ -1,5 +1,6 @@
 package com.gmalandrakis.mnemosyne.cache;
 
+import com.gmalandrakis.mnemosyne.annotations.Cached;
 import com.gmalandrakis.mnemosyne.core.ValuePool;
 import com.gmalandrakis.mnemosyne.structures.CacheParameters;
 import com.gmalandrakis.mnemosyne.structures.IdWrapper;
@@ -46,7 +47,9 @@ public abstract class AbstractMnemosyneCache<K, ID, V> {
         this.valuePool = valuePool;
     }
 
-
+   /* public AbstractMnemosyneCache(CacheParameters parameters, ValuePool<ID, V> valuePool) { //TODO: See if this fixes  "FIXME: 1"
+        this.valuePool = valuePool;
+    }*/
     /**
      * Adds the given key-value pair to the cache.
      * <p>

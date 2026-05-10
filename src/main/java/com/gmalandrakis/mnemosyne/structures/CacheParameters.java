@@ -8,6 +8,9 @@ import com.gmalandrakis.mnemosyne.cache.AbstractMnemosyneCache;
  */
 public class CacheParameters {
 
+    private static final int MAX_MAP_SIZE = 1 << 30 - 1;
+    private static final int DEFAULT_MAP_SIZE = 16;
+
     private Class<? extends AbstractMnemosyneCache> cacheType;
     private String cacheName;
     private long timeToLive;
@@ -30,7 +33,7 @@ public class CacheParameters {
     }
 
     public long getTimeToLive() {
-        return timeToLive;
+        return (timeToLive <= 0 ? Long.MAX_VALUE : timeToLive);
     }
 
     public void setTimeToLive(long timeToLive) {
@@ -38,7 +41,7 @@ public class CacheParameters {
     }
 
     public int getCapacity() {
-        return capacity;
+        return  (capacity < 0 ? MAX_MAP_SIZE : ( capacity == 0 ? DEFAULT_MAP_SIZE : capacity));
     }
 
     public void setCapacity(int capacity) {
@@ -46,7 +49,7 @@ public class CacheParameters {
     }
 
     public long getInvalidationInterval() {
-        return invalidationInterval;
+        return (invalidationInterval < 0 ? Long.MAX_VALUE : invalidationInterval);
     }
 
     public void setInvalidationInterval(long invalidationInterval) {
@@ -78,7 +81,7 @@ public class CacheParameters {
     }
 
     public short getPreemptiveEvictionPercentage() {
-        return preemptiveEvictionPercentage;
+       return preemptiveEvictionPercentage = (preemptiveEvictionPercentage <= 0 || preemptiveEvictionPercentage >= 100 ? 100 : preemptiveEvictionPercentage);
     }
 
     public void setPreemptiveEvictionPercentage(short preemptiveEvictionPercentage) {
@@ -86,7 +89,7 @@ public class CacheParameters {
     }
 
     public short getEvictionStepPercentage() {
-        return evictionStepPercentage;
+        return (evictionStepPercentage < 0 || evictionStepPercentage > 100) ? 0 : evictionStepPercentage;
     }
 
     public void setEvictionStepPercentage(short evictionStepPercentage) {

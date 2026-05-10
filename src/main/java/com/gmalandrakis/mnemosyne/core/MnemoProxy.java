@@ -6,6 +6,8 @@ import com.gmalandrakis.mnemosyne.annotations.UpdateKey;
 import com.gmalandrakis.mnemosyne.annotations.UpdatesCache;
 import com.gmalandrakis.mnemosyne.cache.AbstractGenericCache;
 import com.gmalandrakis.mnemosyne.cache.AbstractMnemosyneCache;
+import com.gmalandrakis.mnemosyne.exception.MnemosyneRuntimeException;
+import com.gmalandrakis.mnemosyne.exception.MnemosyneUpdateException;
 import com.gmalandrakis.mnemosyne.structures.AddMode;
 import com.gmalandrakis.mnemosyne.structures.CompoundKey;
 import com.gmalandrakis.mnemosyne.structures.RemoveMode;
@@ -38,6 +40,8 @@ public class MnemoProxy<K, ID, V> {
 
     private final boolean specialCollectionHandlingEnabled;
 
+    private final boolean disableParallelProcessing;
+
     private final ValuePool<ID, V> valuePool;
 
     private final Method cachedMethod;
@@ -46,8 +50,10 @@ public class MnemoProxy<K, ID, V> {
 
     private final ExecutorService executorService;
 
+    private final String cacheName;
+
     public MnemoProxy(AbstractMnemosyneCache<K, ID, V> cache, Method method, Object invocationTargetObject,
-                      ValuePool<ID, V> valuePool, boolean returnsCollections, boolean specialCollectionHandling) {
+                      ValuePool<ID, V> valuePool, boolean returnsCollections, boolean specialCollectionHandling, boolean disableParallelProcessing, String cacheName) {
         this.cache = cache;
         this.cachedMethod = method;
         this.invocationTargetObject = invocationTargetObject;
@@ -56,6 +62,8 @@ public class MnemoProxy<K, ID, V> {
         assert (!(specialCollectionHandling && !returnsCollections));
         this.returnsCollections = returnsCollections;
         this.specialCollectionHandlingEnabled = specialCollectionHandling;
+        this.disableParallelProcessing = disableParallelProcessing;
+        this.cacheName = cacheName;
     }
 
     Cached getAnnotation() {
@@ -86,7 +94,7 @@ public class MnemoProxy<K, ID, V> {
             return getSingleAndUpdate(compoundKey, args);
         } else {
             if (specialCollectionHandlingEnabled) {
-                return getMultipleSpecialAndUpdate(compoundKey, args);
+                return getMultipleSpecialAndUpdateParallel(compoundKey, args);
             } else {
                 return getMultipleAndUpdate(Collections.emptySet(), compoundKey, args);
             }
@@ -203,7 +211,7 @@ public class MnemoProxy<K, ID, V> {
         var targetKeyNamesAndValues = linkTargetObjectKeysToObjects(List.of(targetObjectKeyNamesAndValues), updatedValue);
         var key = getCompoundKeyForUpdate(annotatedKeyNamesAndValues, targetKeyNamesAndValues, updateCache.keyOrder(), cachedMethod, this.isSpecialCollectionHandlingEnabled());
         if (!validArgs(cachedMethod, key)) { //If the compoundKey does not correspond to the underlying arguments, there is nothing to add preemptively
-            return; //TODO: Vres to lathos.
+            return;
         }
 
         var explicitRemovalOnCondition = getCondition(updateCache.removeOnCondition(), annotatedKeyNamesAndValues, updatedValue, updateCache.conditionalANDGate());
@@ -406,7 +414,7 @@ public class MnemoProxy<K, ID, V> {
     }
 
     //TODO: FFS, improve this cowboy-coded clusterfuck or remove the functionality altogether.
-    private Map<ID, V> getMultipleSpecialAndUpdate(CompoundKey compoundKey, Object... args) {
+    private Map<ID, V> getMultipleSpecialAndUpdateParallel(CompoundKey compoundKey, Object... args) {
         assert (specialCollectionHandlingEnabled && compoundKey.getKeyObjects().length == 1
                 && compoundKey.getKeyObjects()[0] instanceof Collection && args.length == 1); //A very specific but very common subcase: calling a repository or rest-api method with a single Collection of IDs as argument
         // var returnTypeIsList = List.class.isAssignableFrom(cachedMethod.getReturnType());
@@ -416,9 +424,8 @@ public class MnemoProxy<K, ID, V> {
         List<K> failedKeys = Collections.synchronizedList(new ArrayList<K>()); //a list with the keys that did not return a value, i.e. returned empty collection or null.
         //  var keyValueMap = new ConcurrentHashMap<K, V>();
         Map<ID, V> initiallyMissedFromCache = new ConcurrentHashMap<>();
-        keys.stream()
-                .parallel()
-                .forEach(k -> { //Note again that k is not a compoundKey!
+        var keyStream = disableParallelProcessing ? keys.stream() : keys.stream().parallel();
+        keyStream.forEach(k -> { //Note again that k is not a compoundKey!
                     var hit = (V) cache.get((K) MnemoCommon.deduceCompoundKeyFromMethodAndArgs(cachedMethod, new Object[]{k})); //reminder that (k) is never equal to CompoundKey(k), and since we wrap all (k)s around CompoundKeys everywhere else, we need to do so here too
                     if (hit == null) {
                         failedKeys.add(k);
@@ -429,8 +436,9 @@ public class MnemoProxy<K, ID, V> {
                 });
 
         if (!failedKeys.isEmpty()) {
-            failedKeys.stream()
-                    .parallel() //Absolutely has to be parallel; unless having just a few keys, serial invocations to the underlying method will cause a hell of a delay
+            var failedKeyStream = disableParallelProcessing ? failedKeys.stream() : failedKeys.stream().parallel();
+            // //It ideally is parallel; unless having just a few keys, serial invocations to the underlying method will cause a hell of a delay
+            failedKeyStream
                     .forEach(failedKey -> {
                                 var callWith = keyTypeIsList ? Collections.singletonList(failedKey) : Collections.singleton(failedKey);  //invoke with singleton List or Set.
                                 var value = invokeUnderlyingMethod(callWith);

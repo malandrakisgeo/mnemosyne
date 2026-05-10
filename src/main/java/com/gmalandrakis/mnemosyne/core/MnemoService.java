@@ -16,7 +16,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.stream.Collectors;
 
 import static com.gmalandrakis.mnemosyne.core.MnemoCommon.*;
 import static com.gmalandrakis.mnemosyne.utils.ParameterUtils.annotationValuesToCacheParameters;
@@ -41,7 +40,7 @@ public class MnemoService {
     public Object invokeMethodAndUpdateValuePool(Method method, Object obj, Object... args) {
         Object object = null;
         try {
-            object = method.invoke(obj, args); //PROBLEM-THREAD:1
+            object = method.invoke(obj, args);
         } catch (IllegalAccessException | InvocationTargetException e) {
             throw new RuntimeException(e);
         }
@@ -232,20 +231,22 @@ public class MnemoService {
         Class<?> returnedClassType = method.getReturnType();
 
         var handleCollectionKeysSeparately = annotation.allowSeparateHandlingForKeyCollections();
+        var disableParallel = annotation.disableParallelProcessing();
         var returnsCollection = Collection.class.isAssignableFrom(returnedClassType);
 
-        var cacheParams = annotationValuesToCacheParameters(annotation, returnsCollection, handleCollectionKeysSeparately);
+        var cacheParams = annotationValuesToCacheParameters(annotation, returnsCollection);
         generalControls(method, cacheParams);
 
-        Class<? extends AbstractMnemosyneCache> algoClass = cacheParams.getCacheType();
+        Class<? extends AbstractMnemosyneCache> algoClass = annotation.cacheType();
         ValuePool valuePool = getOrCreateValuePool(method);
         AbstractMnemosyneCache cache = null;
         try {
-            cache = algoClass.getDeclaredConstructor(CacheParameters.class, ValuePool.class).newInstance(cacheParams, valuePool);
+            cache = algoClass.getDeclaredConstructor(CacheParameters.class, ValuePool.class).newInstance(cacheParams, valuePool); //TODO: This means that we can only ever use AbstractGenericCache. FIXME: 1
         } catch (Exception e) {
             throw new MnemosyneRuntimeException(e);
         }
-        var proxyService = new MnemoProxy<>(cache, method, singletonBean, valuePool, returnsCollection, handleCollectionKeysSeparately);
+        var proxyService = new MnemoProxy<>(cache, method, singletonBean, valuePool, returnsCollection, handleCollectionKeysSeparately,
+                disableParallel, annotation.cacheName());
 
         proxies.put(method, proxyService);
         var proxyList = proxiesByValuePool.getOrDefault(valuePool, new ArrayList<>());
