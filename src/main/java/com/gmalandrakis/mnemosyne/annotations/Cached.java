@@ -78,8 +78,9 @@ public @interface Cached {
      * The use of this value is up to the implementation of the AbstractMnemosyneCache. Depending on the implementation, it may set a limit on
      * the IDs/values saved, or a limit on the keys independently of how many IDs/values they are associated with, or a limit on both.
      * <p>
-     * By default, there is no capacity, and that means that all entries are kept in memory
+     * By default, there is no capacity, and that means that the default number of allocation allowed for a HashMap is kept in memory (16 for most JVM implementations)
      * as long as the program runs unless evicted by other mechanisms (e.g. expiration check, manual invalidation, removal via an @UpdatesCache, etc).
+     * <b>Negative values allocate the maximum number of entries allowed in a HashMap. This can lead to OOM errors.</b>
      * <p>
      * In implementations of {@link AbstractGenericCache AbstractGenericCache}, this refers to the maximum number of keys
      * allowed in memory, and zero or negative values are ignored.
@@ -128,20 +129,30 @@ public @interface Cached {
      * <p>
      * Whenever the Method is called with a Collection of keys, Mnemosyne will:<br>
      * 1. Check which keys already exist in the cache<br>
-     * 2. Asynchronously call the Method with every key that did not exist in the cache separately, and create a map of keys and values.<br>
+     * 2. Call the Method with every key that did not exist in the cache separately, asynchronously by default and synchronously if
+     * disableParallelProcessing() is set to true, and create a map of keys and values.<br>
      * 3. Store the result in the cache<br>
      * 4. Return a combination of existent and the new values.<br>
      * Can work only for methods that return an abstract Collection, List, or Set (i.e. will not work with Methods that
      * return concrete implementations of the aforementioned, like ArrayList or HashSet), with a 1-1 correspondence
      * between keys and values.
      * <p>
-     * Setting to true can make your cache more effective in the long-term, but may make it slower in the beginning.
      * Should not be set to true if the underlying method calls a pay-per-request service.
      * Setting to true is not recommended unless necessary,
      * and <b>strongly discouraged</b> in cases where the length and/or element order of the collection used as argument
      * or returned plays any role (e.g. Collection of XY coordinates).
      */
     boolean allowSeparateHandlingForKeyCollections() default false;
+
+
+    /**
+     * Used only with separate handling for key collections.
+     * When false, if a Collection of keys does not correspond to values in the cache, these will be
+     * retrieved asynchronously by multithreaded calls to the target Method.
+     * This can, however, be problematic in some cases,
+     * so it can be disabled by setting to true.
+     */
+    boolean disableParallelProcessing() default false;
 
     /**
      * The names of the key fields present in the target object, i.e. the object that is used for the update (either annotated as @UpdatedValue, or just what the Method returns if an @UpdatedValue is not present).
@@ -160,7 +171,6 @@ public @interface Cached {
     /**
      * Determines how new values are added to the existing caches.
      * Refer to {@link AddMode} for further details.
-     *
      */
     AddMode addMode();
 

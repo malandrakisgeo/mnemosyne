@@ -1,5 +1,6 @@
 package com.gmalandrakis.mnemosyne.cache;
 
+import com.gmalandrakis.mnemosyne.annotations.Cached;
 import com.gmalandrakis.mnemosyne.structures.CacheParameters;
 import com.gmalandrakis.mnemosyne.structures.IdWrapper;
 import com.gmalandrakis.mnemosyne.core.ValuePool;
@@ -30,13 +31,13 @@ public abstract class AbstractGenericCache<K, ID, V> extends AbstractMnemosyneCa
     public AbstractGenericCache(CacheParameters parameters, ValuePool<ID, V> valuePool) {
         super(parameters, valuePool, new ConcurrentHashMap<K, IdWrapper<ID>>());
         this.valuePool = valuePool;
-        this.totalCapacity = (parameters.getCapacity() <= 0 ? MAX_MAP_SIZE : parameters.getCapacity()); //Hashmap's default total capacity
-        this.timeToLive = (parameters.getTimeToLive() <= 0 ? Long.MAX_VALUE : parameters.getTimeToLive());
-        this.invalidationInterval = (parameters.getInvalidationInterval() < 0 ? Long.MAX_VALUE : parameters.getInvalidationInterval());
+        this.totalCapacity = parameters.getCapacity();
+        this.timeToLive = parameters.getTimeToLive();
+        this.invalidationInterval = parameters.getInvalidationInterval();
         this.name = parameters.getCacheName();
         this.countdownFromCreation = parameters.isCountdownFromCreation();
-        this.preemptiveEvictionPercentage = (parameters.getPreemptiveEvictionPercentage() <= 0 || parameters.getPreemptiveEvictionPercentage() >= 100 ? 100 : parameters.getPreemptiveEvictionPercentage());
-        this.evictionStepPercentage = (parameters.getEvictionStepPercentage() < 0 || parameters.getEvictionStepPercentage() > 100) ? 0 : parameters.getEvictionStepPercentage();
+        this.preemptiveEvictionPercentage = parameters.getPreemptiveEvictionPercentage();
+        this.evictionStepPercentage = parameters.getEvictionStepPercentage();
         this.actualCapacity = (totalCapacity * (preemptiveEvictionPercentage / 100f));
         if (parameters.getThreadPoolSize() > 5) {
             internalThreadService = Executors.newFixedThreadPool(parameters.getThreadPoolSize());
