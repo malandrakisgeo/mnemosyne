@@ -1,3 +1,8 @@
+
+/*
+ * Copyright © 2026 Georgios Malandrakis
+ * Licensed under the MIT License.
+ */
 package com.gmalandrakis.mnemosyne.annotations;
 
 import com.gmalandrakis.mnemosyne.cache.AbstractGenericCache;

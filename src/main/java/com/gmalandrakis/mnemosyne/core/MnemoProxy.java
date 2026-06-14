@@ -1,3 +1,7 @@
+/*
+ * Copyright © 2026 Georgios Malandrakis
+ * Licensed under the MIT License.
+ */
 package com.gmalandrakis.mnemosyne.core;
 
 import com.gmalandrakis.mnemosyne.annotations.Cached;
@@ -426,14 +430,14 @@ public class MnemoProxy<K, ID, V> {
         Map<ID, V> initiallyMissedFromCache = new ConcurrentHashMap<>();
         var keyStream = disableParallelProcessing ? keys.stream() : keys.stream().parallel();
         keyStream.forEach(k -> { //Note again that k is not a compoundKey!
-                    var hit = (V) cache.get((K) MnemoCommon.deduceCompoundKeyFromMethodAndArgs(cachedMethod, new Object[]{k})); //reminder that (k) is never equal to CompoundKey(k), and since we wrap all (k)s around CompoundKeys everywhere else, we need to do so here too
-                    if (hit == null) {
-                        failedKeys.add(k);
-                    } else {
-                        //      keyValueMap.put(k, hit); //As noted in the documentation, a 1-1 correlation is assumed: one key corresponds to at most one value.
-                        initiallyMissedFromCache.put((ID) MnemoCommon.deduceIdOrMap(hit), hit);
-                    }
-                });
+            var hit = (V) cache.get((K) MnemoCommon.deduceCompoundKeyFromMethodAndArgs(cachedMethod, new Object[]{k})); //reminder that (k) is never equal to CompoundKey(k), and since we wrap all (k)s around CompoundKeys everywhere else, we need to do so here too
+            if (hit == null) {
+                failedKeys.add(k);
+            } else {
+                //      keyValueMap.put(k, hit); //As noted in the documentation, a 1-1 correlation is assumed: one key corresponds to at most one value.
+                initiallyMissedFromCache.put((ID) MnemoCommon.deduceIdOrMap(hit), hit);
+            }
+        });
 
         if (!failedKeys.isEmpty()) {
             var failedKeyStream = disableParallelProcessing ? failedKeys.stream() : failedKeys.stream().parallel();

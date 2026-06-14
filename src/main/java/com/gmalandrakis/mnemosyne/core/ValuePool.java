@@ -1,3 +1,7 @@
+/*
+ * Copyright © 2026 Georgios Malandrakis
+ * Licensed under the MIT License.
+ */
 package com.gmalandrakis.mnemosyne.core;
 
 import com.gmalandrakis.mnemosyne.structures.CacheValue;

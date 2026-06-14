@@ -1,5 +1,8 @@
+/*
+ * Copyright © 2026 Georgios Malandrakis
+ * Licensed under the MIT License.
+ */
 package com.gmalandrakis.mnemosyne.core;
-
 import com.gmalandrakis.mnemosyne.annotations.*;
 import com.gmalandrakis.mnemosyne.cache.AbstractMnemosyneCache;
 import com.gmalandrakis.mnemosyne.exception.MnemosyneInitializationException;

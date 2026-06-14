@@ -1,5 +1,9 @@
 package com.gmalandrakis.mnemosyne.annotations;
 
+/*
+ * Copyright © 2026 Georgios Malandrakis
+ * Licensed under the MIT License.
+ */
 import com.gmalandrakis.mnemosyne.structures.AddMode;
 import com.gmalandrakis.mnemosyne.structures.RemoveMode;
 

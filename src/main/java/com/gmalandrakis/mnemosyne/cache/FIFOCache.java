@@ -1,3 +1,7 @@
+/*
+ * Copyright © 2026 Georgios Malandrakis
+ * Licensed under the MIT License.
+ */
 package com.gmalandrakis.mnemosyne.cache;
 
 import com.gmalandrakis.mnemosyne.core.ValuePool;
@@ -24,6 +28,9 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  * @param <K>
  * @param <ID>
  * @param <T>
+ *
+ *  <p>
+ *  @author George Malandrakis (malandrakisgeo@gmail.com)
  */
 @SuppressWarnings({"unchecked", "rawtypes"})
 public class FIFOCache<K, ID, T> extends AbstractGenericCache<K, ID, T> {
